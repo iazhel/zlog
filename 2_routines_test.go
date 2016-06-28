@@ -47,7 +47,7 @@ func Test_zlogRoutine(t *testing.T) {
 	Desc(t, "zlog_ChekRoutine", func(it It) {
 		it("should create two independent logs and fill their by goroutines.", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			ready := make(chan bool)
 
 			log1.Step("Step 1.")
@@ -72,10 +72,10 @@ func Test_zlogRoutine(t *testing.T) {
 
 		it("should create two independent logs variables by one logger.", func(expect Expect) {
 
-			logger := NewLogger()
-			log1 := logger.NewStep("Step 1.")
+			logger := NewZLog()
+			logger.Step("Step 1.")
 
-			msgs1 := log1.GetLog()
+			msgs1 := logger.GetLog()
 
 			expect(msgs1).ToExist()       // verify initialization
 			expect(len(msgs1)).ToEqual(1) // verify len log
@@ -84,15 +84,15 @@ func Test_zlogRoutine(t *testing.T) {
 
 		it("should create two independent logs and fill it.", func(expect Expect) {
 
-			logger := NewLogger()
+			logger := NewZLog()
 
-			log1 := logger.NewStep("Step 1.")
-			log1.Error("Msg 1..")
-			msgs1 := log1.GetLog()
+			logger.Step("Step 1.")
+			logger.Error("Msg 1..")
+			msgs1 := logger.GetLog()
 
-			log2 := logger.NewStep("Step 2.")
-			log2.Error("Msg 2..")
-			msgs2 := log2.GetLog()
+			logger.Step("Step 2.")
+			logger.Error("Msg 2..")
+			msgs2 := logger.GetLog()
 
 			expect(strings.Contains(msgs1[1], "Msg 1..")).ToEqual(true)  // must contain
 			expect(strings.Contains(msgs1[1], "Msg 2..")).ToEqual(false) // must not contain
@@ -102,16 +102,16 @@ func Test_zlogRoutine(t *testing.T) {
 
 		it("should create 3 independent logs and fill their by goroutines.", func(expect Expect) {
 
-			logger := NewLogger()
+			logger := NewZLog()
 			ready := make(chan bool, 3)
 
-			log1 := logger.NewStep("The fmt.Print(GetLog()) output example. Step 1.")
-			log2 := logger.NewStep("The output example. Step 2.")
-			log3 := logger.NewStep("The output example. Step 3.")
+			logger.Step("The fmt.Print(GetLog()) output example. Step 1.")
+			logger.Step("The output example. Step 2.")
+			logger.Step("The output example. Step 3.")
 
-			go routWarning(log2, "Rout 2..", ready)
-			go routError(log3, "Rout 3..", ready)
-			go routInfo(log1, "Rout 1..", ready)
+			go routWarning(logger, "Rout 2..", ready)
+			go routError(logger, "Rout 3..", ready)
+			go routInfo(logger, "Rout 1..", ready)
 
 			<-ready
 			<-ready

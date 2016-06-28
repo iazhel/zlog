@@ -14,7 +14,7 @@ func Benchmark_Info(b *testing.B) {
 	m := int(size * 1024 / sizeMessage) // Number of Info logs.
 	counter := 0
 
-	zLog := NewZlog()
+	zLog := NewZLog()
 	zLog.Step("Making Step with size %d Kb", size)
 	b.ResetTimer()
 
@@ -40,7 +40,7 @@ func Benchmark_Step_Warning(b *testing.B) {
 	m := int(size * 1024 / sizeMessage)
 	counter := 0
 
-	zLog := NewZlog()
+	zLog := NewZLog()
 	zLog.Step("Making Step(block) with size %d Kb and Warning", size)
 	b.ResetTimer()
 
@@ -67,7 +67,7 @@ func Benchmark_Step_Error(b *testing.B) {
 	m := int(size * 1024 / sizeMessage)
 	counter := 0
 
-	zLog := NewZlog()
+	zLog := NewZLog()
 	zLog.Step("Making Step(block) with size %d Kb and ERROR", size)
 	b.ResetTimer()
 
@@ -94,7 +94,7 @@ func Benchmark_Step_v1(b *testing.B) {
 	m := int(size * 1024 / sizeMessage)
 	counter := 0
 	counterSteps := 0
-	zLog := NewZlog()
+	zLog := NewZLog()
 	zLog.Step("Making Step(block) with size %d Kb and ERROR", size)
 	fmt.Printf("\nMade %d messages with ERROR lenght: %d bytes, total: %d Kbytes", m, sizeMessage, int(counter/(1024)))
 

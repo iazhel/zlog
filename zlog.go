@@ -1,42 +1,24 @@
 package zlog
 
-// Package zlog implements a logging package. /It defines a type, Log.
 /*
-	// initialiation
-	log := NewLogger()
-	//  or
-	log := NewLogger('/tmp/zlog.log')
+The package implements a parallel logging.
+ It defines a type ZLoger.
 
-	// working code
+ Logger initialises with output file:
+	log := NewLog('/tmp/systemlog.log')
+
+ Or without file, in this case logs shold be saved in log.ReserveFile:
+	log := NewLog()
+	------------------
 	log.Step("Step 1.")
 	log.Info("Msg ...")
 	log.Warning("Msg ...%d...", intVar, ...)
 	log.Error("Msg ... %v"..., errVar, ...)
 
 	// OUTPUT
-	messages := log.GetLog() // get only messages and clear log.
-	writtenByte, err := log.WriteLog() // write to source file, and clear all logs.
-
+	messages := log.GetLog() // get array of string messages and remove it from log.
+	n, err := log.WriteLog() // write to source file n bytes, and clear all logs.
 */
-
-// Messages in this logger are written with methods Error, Warning, Info, Step.
-// Method GetLog moves all saved information into string slice.
-// Method WriteLog moves all saved information into string slice.
-
-// Log adds prefixes to all messages.
-// These methods support formatting like fmt.Sprintf.
-// Logs divide messages into the blocks by Step method.
-// This method creates and saves name for block.
-// It adds suffixe to block name.
-// That Step method deletes all info logs, if these logs contain
-// no warning or error message.
-// When error is in the block,
-// Step saves all logs and name of current step to stringRes.
-// When warning is in the block,
-// zlog saves logs, that were written before warning message.
-// Number of saved logs euivalents warningLen.
-// WarningLen may be set with SetWarningLen function.
-// WarningLen is 10, when ZLoger is initialaized.
 
 import (
 	"fmt"
@@ -69,8 +51,27 @@ type ZLogger struct {
 	sOK, sWarn, sErr string // suffixes
 }
 
-// NewLogger creates a new object.
-func NewLogger(out ...interface{}) *ZLogger {
+// Messages in this logger are written with methods Error, Warning, Info, Step.
+// Method GetLog moves all saved information into string slice.
+// Method WriteLog moves all saved information into string slice.
+
+// Log adds prefixes to all messages.
+// These methods support formatting like fmt.Sprintf.
+// Logs divide messages into the blocks by Step method.
+// This method creates and saves name for block.
+// It adds suffixe to block name.
+// That Step method deletes all info logs, if these logs contain
+// no warning or error message.
+// When error is in the block,
+// Step saves all logs and name of current step to stringRes.
+// When warning is in the block,
+// zlog saves logs, that were written before warning message.
+// Number of saved logs euivalents warningLen.
+// WarningLen may be set with SetWarningLen function.
+// WarningLen is 10, when ZLoger is initialaized.
+
+// NewZLogger creates a new object.
+func NewZLog(out ...interface{}) *ZLogger {
 	self := &ZLogger{}
 	currentOS := runtime.GOOS
 	if len(out) > 0 {
@@ -186,11 +187,11 @@ func (self *ZLogger) Step(format string, v ...interface{}) {
 	return
 }
 
-// NewStep creates new Step, and return himself(for compatibility).
-func (self *ZLogger) NewStep(format string, v ...interface{}) *ZLogger {
-	self.Step(fmt.Sprintf(format, v...))
-	return self
-}
+// Step creates new Step, and return himself(for compatibility).
+//func (self *ZLogger) Step(format string, v ...interface{}) *ZLogger {
+//	self.Step(fmt.Sprintf(format, v...))
+//	return self
+//}
 
 // This clearStep method deletes all unsaved logs.
 // Metod clears all flags.
@@ -296,14 +297,9 @@ func (self *ZLogger) writeFile(operation string) (n int, err error) {
 	return n, nil
 }
 
-// NewZlog creates new Log, and return himself(for compatibility).
-func NewZlog(v ...interface{}) *ZLogger {
-	return NewLogger()
-}
-
-func (self *ZLogger) GetAllLog() (msgs []string) {
-	return self.GetLog()
-}
+//func (self *ZLogger) GetAllLog() (msgs []string) {
+//	return self.GetLog()
+//}
 
 // Method checks Step creation. If msg position is first,
 // this method creates and saves name for Step.

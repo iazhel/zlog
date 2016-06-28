@@ -13,7 +13,7 @@ func Test_OldLog(t *testing.T) {
 	Desc(t, "zlog_Chek", func(it It) {
 
 		it("shold create var zLog (type *ZLogger) and verify initial data", func(expect Expect) {
-			zLog := NewZlog()
+			zLog := NewZLog()
 			zLog.Error("Part 1.")
 			logs := zLog.GetLog()
 
@@ -26,7 +26,7 @@ func Test_OldLog(t *testing.T) {
 		return
 		it("shold get only name of the Step with suffix '[OK]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Error("Part 1.")
 			zLog.Info("Event 1")
@@ -50,7 +50,7 @@ func Test_OldLog(t *testing.T) {
 
 		it("shold get only name of the Step with suffix '[OK]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Warning("Part 1.")
 			zLog.Info("Event 1")
@@ -65,7 +65,7 @@ func Test_OldLog(t *testing.T) {
 		})
 		it("shold get only name of the Step with suffix '[OK]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Info("Event 1")
 			zLog.Info("Part 0.")
@@ -78,7 +78,7 @@ func Test_OldLog(t *testing.T) {
 		})
 		it("shold get only name of the Step with suffix '[OK]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Error("Part 1.")
 			zLog.Info("Event 1")
@@ -97,7 +97,7 @@ func Test_OldLog(t *testing.T) {
 
 		it("shold get all blocks log and name of the block with suffix '[WARNING]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 			zLog.Step("Part 2.")
 			zLog.Info("Event 1")
 			zLog.Info("Event 2")
@@ -112,7 +112,7 @@ func Test_OldLog(t *testing.T) {
 
 		it("shold get all blocks log and name of the block with suffix '[ERROR]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Step("Part 3.")
 			zLog.Info("Event 1")
@@ -130,7 +130,7 @@ func Test_OldLog(t *testing.T) {
 
 		it("shold get 34 from 49 logs and name of the block with suffix '[WARNING]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Step("Part 5.")
 			for i := 0; i < 3; i++ {
@@ -149,7 +149,7 @@ func Test_OldLog(t *testing.T) {
 
 		it("shold get 37 from 52 logs and name of the block with suffix '[WARNING]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Step("Part 6.")
 			for i := 0; i < 3; i++ {
@@ -169,7 +169,7 @@ func Test_OldLog(t *testing.T) {
 
 		it("shold get 22 logs and name of the block with suffix '[WARNING]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Step("Part 7.")
 			for i := 0; i < 20; i++ {
@@ -187,7 +187,7 @@ func Test_OldLog(t *testing.T) {
 
 		it("shold get 29 logs and name of the block with suffix '[ERROR]'", func(expect Expect) {
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Step("Part 8.")
 			for i := 0; i < 6; i++ {
@@ -233,7 +233,7 @@ func Test_OldLog(t *testing.T) {
 				"Calculation result: %.3f",
 				"Cann't create file: %v\n\n"}
 
-			zLog := NewZlog()
+			zLog := NewZLog()
 
 			zLog.Step(message[0])
 			zLog.Info(message[1], fileNames)

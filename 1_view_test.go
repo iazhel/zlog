@@ -22,9 +22,9 @@ func Test_NewZLog(t *testing.T) {
 	Desc(t, "zlog_Chek", func(it It) {
 
 		it("should create var logger (type *ZLogger) and get empty log list.", func(expect Expect) {
-			log := NewLogger()
+			log := NewZLog()
 			msgs := log.GetLog()
-			logger := NewLogger()
+			logger := NewZLog()
 			msgs = logger.GetLog()
 			expect(logger).ToExist()     // verify creation
 			expect(len(msgs)).ToEqual(0) // verify empty log list
@@ -33,7 +33,7 @@ func Test_NewZLog(t *testing.T) {
 
 		it("should create var logger and make first Step.", func(expect Expect) {
 
-			log := NewLogger()
+			log := NewZLog()
 			log.Step("Step 1")
 			msgs := log.GetLog()
 			expect(log).ToExist()        // verify initialization
@@ -41,10 +41,10 @@ func Test_NewZLog(t *testing.T) {
 
 		})
 
-		it("should not fail on NewStep and GetAllLog.(For old version compatibility)", func(expect Expect) {
+		it("should not fail on Step and GetLog.(For old version compatibility)", func(expect Expect) {
 
-			log := NewLogger()
-			log = log.NewStep("Next Step")
+			log := NewZLog()
+			log.Step("Next Step")
 			log.Info("Message ...")
 			msgs := log.GetLog()
 			expect(log).ToExist()        // verify initialization
@@ -54,7 +54,7 @@ func Test_NewZLog(t *testing.T) {
 
 		it("should get one message with step name and suffix [OK].", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Info("Message ...")
 			log1.Info("Message ...")
 			log1.Info("Message ...")
@@ -67,7 +67,7 @@ func Test_NewZLog(t *testing.T) {
 		})
 		it("should get 3 messages with suffix [Warning].", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Step("Step 1.")
 			log1.Info("Message ...")
 			log1.Warning("Message ...")
@@ -79,7 +79,7 @@ func Test_NewZLog(t *testing.T) {
 
 		})
 		it("should get 3 messages with suffix [Warning].", func(expect Expect) {
-			log := NewLogger()
+			log := NewZLog()
 			log.SetWarningLenght(2)
 
 			log.Step("Step 1.")
@@ -102,7 +102,7 @@ func Test_NewZLog(t *testing.T) {
 
 		it("should get 3 messages with suffix [Error].", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Step("Step 1.")
 			log1.Info("Message ...")
 			log1.Error("Message ...")
@@ -115,7 +115,7 @@ func Test_NewZLog(t *testing.T) {
 		})
 		it("should get 4 messages suffix [Error].", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Step("Step 1.")
 			log1.Info("Message ...")
 			log1.Warning("Message ...")
@@ -130,7 +130,7 @@ func Test_NewZLog(t *testing.T) {
 
 		it("should get no logs names, if GetLog had run before.", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Step("Step 1.")
 			log1.Info("Message ...")
 
@@ -143,7 +143,7 @@ func Test_NewZLog(t *testing.T) {
 
 		it("should get two step names with suffixes [OK].", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Step("Step 1.")
 			log1.Info("Message ...")
 			log1.Info("Message ...")
@@ -161,7 +161,7 @@ func Test_NewZLog(t *testing.T) {
 
 		it("should get 6 messages with suffixes [OK], [Warning], [Error].", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Step("Step 1.")
 
 			log1.Step("Step 1.1.")
@@ -185,7 +185,7 @@ func Test_NewZLog(t *testing.T) {
 
 		it("should create unknown step, if Info has been run before Step.", func(expect Expect) {
 
-			log := NewLogger()
+			log := NewZLog()
 			log.Info("Message ...")
 
 			msgs := log.GetLog()
@@ -196,7 +196,7 @@ func Test_NewZLog(t *testing.T) {
 
 		it("should create unknown step, if Error has been run before Step.", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Step("Step 1.")
 			msgs := log1.GetLog()
 
@@ -209,7 +209,7 @@ func Test_NewZLog(t *testing.T) {
 		})
 		it("should get 4 messages and save to reserve file.", func(expect Expect) {
 
-			log1 := NewLogger()
+			log1 := NewZLog()
 			log1.Step("Step 1.")
 			log1.Info("Message ...")
 			log1.Warning("Message ...")
@@ -223,7 +223,7 @@ func Test_NewZLog(t *testing.T) {
 		})
 		it("should get 4 messages and save to reserve file.", func(expect Expect) {
 
-			log1 := NewLogger("/tmp/test.log")
+			log1 := NewZLog("/tmp/test.log")
 			log1.Step("Step 1.")
 			log1.Info("Message ...")
 			log1.Info("Message ...")
@@ -239,7 +239,7 @@ func Test_NewZLog(t *testing.T) {
 		})
 		it("should create unknown step, if Warning has been run before Step.", func(expect Expect) {
 
-			log1 := NewLogger("/tmp/test.log")
+			log1 := NewZLog("/tmp/test.log")
 			log1.Warning("Message warning...")
 			log1.Info("Message ...")
 			log1.Info("Message ...")
@@ -252,7 +252,7 @@ func Test_NewZLog(t *testing.T) {
 		})
 		it("should create unknown step, if Warning has been run before Step.", func(expect Expect) {
 
-			log1 := NewLogger("/tmp/test.log")
+			log1 := NewZLog("/tmp/test.log")
 			log1.Error("Message error...")
 			log1.Info("Message ...")
 			log1.Info("Message ...")

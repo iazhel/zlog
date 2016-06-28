@@ -138,7 +138,7 @@ func Test_Error__method(t *testing.T) {
 		task.msgsWant = task.routCount*task.loopDeep + 2*task.routCount + 2
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000000)
-		log := NewLogger("/tmp/go_tests/test1.log")
+		log := NewZLog("/tmp/go_tests/test1.log")
 
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
 		task.Do(t, log, log.Info, log.Info, log.Info, log.Error)
@@ -159,7 +159,7 @@ func Test_Warning_method(t *testing.T) {
 		task.msgsWant = task.routCount*2 + 2
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000000)
-		log := NewLogger("/tmp/go_tests/test2.log")
+		log := NewZLog("/tmp/go_tests/test2.log")
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
 		task.Do(t, log, log.Step, log.Info, log.Warning, log.Info)
 	}
@@ -180,7 +180,7 @@ func Test_Step_method(t *testing.T) {
 		task.msgsWant = task.routCount + 1
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000)
-		log := NewLogger()
+		log := NewZLog()
 
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
 		task.Do(t, log, log.Step, log.Info, log.Info, log.Info)
@@ -205,7 +205,7 @@ func Test_Error_Heap(t *testing.T) {
 		task.msgsWant = task.routCount + 1
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000)
-		log := NewLogger()
+		log := NewZLog()
 
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
 		task.Do(t, log, log.Info, log.Info, log.Info, log.Error)
@@ -230,7 +230,7 @@ func Test_Steps_Heap(t *testing.T) {
 		task.msgsWant = task.routCount + 1
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000)
-		log := NewLogger()
+		log := NewZLog()
 
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
 		task.Do(t, log, log.Step, log.Info, log.Info, log.Info)
@@ -254,7 +254,7 @@ func Test_GetLog_Heap(t *testing.T) {
 		checkShortMode(t, task.msgsWant, 333000)
 		var ops, msgsGet int32 = 0, 0
 		ch := make(chan bool)
-		log := NewLogger()
+		log := NewZLog()
 		log.Step("Step 1")
 		for rc := 0; rc < task.routCount; rc++ {
 			go func(n int) {
