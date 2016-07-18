@@ -7,7 +7,6 @@ import (
 )
 
 func routine(n int, log *ZL) {
-	//	fmt.Println("main", n, log.key)
 	for i := 0; i < math.MaxInt32; i++ {
 		time.Sleep(time.Millisecond)
 		f := time.Now().Nanosecond()
@@ -36,9 +35,9 @@ func main() {
 	log := make([]*ZL, n)
 	log[0] = NewZL("/tmp/long_test.log")
 	log[0].CreateLogFile()
-	//	log[0].SetRemoveBeforeGet(true)
+	//log[0].SetRemoveBeforeGet(true)
 	log[0].SetWarningLines(5)
-	//	log[0].SetRemoveBeforeGet(true)
+	//log[0].SetRemoveBeforeGet(true)
 	// bench cycle
 	for j := 0; j < n; j++ {
 		log[j] = log[0].NewStep("The New Step %d", j)

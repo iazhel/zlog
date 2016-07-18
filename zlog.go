@@ -19,7 +19,7 @@ const (
 	reserveLogFile = "/tmp/zlog_autosave.log"
 
 	// WINDOWS
-	//lineSep            = "\r\n"
+	//lineSep           = "\r\n"
 	//reserveLogFile = "c:\\zlog_autosave.log"
 
 )
