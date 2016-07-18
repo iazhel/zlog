@@ -1,25 +1,5 @@
 package zlog
 
-/*
-The package implements a parallel logging.
- It defines a type ZLoger.
-
- Logger initialises with output file:
-	log := NewLog('/tmp/systemlog.log')
-
- Or without file, in this case logs shold be saved in log.ReserveFile:
-	log := NewLog()
-	------------------
-	log.Step("Step 1.")
-	log.Info("Msg ...")
-	log.Warning("Msg ...%d...", intVar, ...)
-	log.Error("Msg ... %v"..., errVar, ...)
-
-	// OUTPUT
-	messages := log.GetLog() // get array of string messages and remove it from log.
-	n, err := log.WriteLog() // write to source file n bytes, and clear all logs.
-*/
-
 import (
 	"fmt"
 	"os"
@@ -27,216 +7,342 @@ import (
 	"reflect"
 	"runtime"
 	"runtime/debug"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	reserveLogFile_Lin = "/tmp/zlog_autosave.log"
-	reserveLogFile_Win = "C:\\go_test.log"
+	// LINUX
+	lineSep        = "\n"
+	reserveLogFile = "/tmp/zlog_autosave.log"
+
+	// WINDOWS
+	//lineSep            = "\r\n"
+	//reserveLogFile = "c:\\zlog_autosave.log"
+
 )
 
-type ZLogger struct {
-	logThisStep      []string // logs of the block
-	stringRes        []string // for saving valuable logs
-	flagError        bool     // error availability flag
-	posWarning       []int    // warning availability position
-	notFirstMsg      bool     // the not first message in the step flag
-	warningLen       int      // the numbers of lines to save
-	linesAlloc       int      // the numbers of lines had saved, after memory clear.
-	sync.Mutex                //
-	ReserveFile      string
-	OutSource        string
-	pOK, pWarn, pErr string // perfixex
-	sOK, sWarn, sErr string // suffixes
+// chain relationship implementing
+type ZL struct {
+	sync.Mutex //
+	isRoot     bool
+	parent     *ZL              // pointer to parent(root)
+	key        int              // key for map child
+	nextKey    int              //
+	children   map[int]*ZL      // pointers to childs
+	logs       map[int][]string // current logs place
+	//	logsCounter        map[int]int      // logs counter
+	storage         map[int]string // storage of comresed steps.
+	warningPls      []int          // log positions what contains warnings
+	errorPls        []int          // log positions what contains errors
+	warningLines    int            // number lines before warning to save
+	removeBeforeGet bool
+	OutSource       string
+	processed       bool
 }
 
-// Messages in this logger are written with methods Error, Warning, Info, Step.
-// Method GetLog moves all saved information into string slice.
-// Method WriteLog moves all saved information into string slice.
+type pair struct {
+	begin, end int
+}
 
-// Log adds prefixes to all messages.
-// These methods support formatting like fmt.Sprintf.
-// Logs divide messages into the blocks by Step method.
-// This method creates and saves name for block.
-// It adds suffixe to block name.
-// That Step method deletes all info logs, if these logs contain
-// no warning or error message.
-// When error is in the block,
-// Step saves all logs and name of current step to stringRes.
-// When warning is in the block,
-// zlog saves logs, that were written before warning message.
-// Number of saved logs euivalents warningLen.
-// WarningLen may be set with SetWarningLen function.
-// WarningLen is 10, when ZLoger is initialaized.
-
-// NewZLogger creates a new object.
-func NewZLog(out ...interface{}) *ZLogger {
-	self := &ZLogger{}
-	currentOS := runtime.GOOS
+func NewZL(out ...interface{}) *ZL {
+	zl := &ZL{
+		isRoot:          true,
+		removeBeforeGet: false,
+		warningLines:    10,
+		logs:            make(map[int][]string, 0),
+		//		logsCounter:        make(map[int]int, 0),
+		storage:  make(map[int]string, 0),
+		children: make(map[int]*ZL, 0),
+	}
 	if len(out) > 0 {
 		value := reflect.ValueOf(out[0])
-		self.OutSource = value.String()
-	}
-	switch currentOS {
-	case "linux":
-		self.ReserveFile = reserveLogFile_Lin
-		self.pWarn = prefixWarning
-		self.pErr = prefixError
-		self.sOK = suffixOK
-		self.sWarn = suffixWarning
-		self.sErr = suffixError
-
-	case "windows":
-		self.ReserveFile = reserveLogFile_Win
-		self.pWarn = prefixWarning_Win
-		self.pErr = prefixError_Win
-		self.sOK = suffixOK_Win
-		self.sWarn = suffixWarning_Win
-		self.sErr = suffixError_Win
-	}
-	self.warningLen = 10
-	return self
-}
-
-// Function creates log with error description.
-func (self *ZLogger) Error(format string, v ...interface{}) {
-	self.Lock()
-	self.checkMsgPos("")
-	self.flagError = true
-	self.logThisStep = append(self.logThisStep, fmt.Sprintf(self.pErr+format, v...))
-	self.Unlock()
-}
-
-// Function creates log with warning description.
-func (self *ZLogger) Warning(format string, v ...interface{}) {
-	self.Lock()
-	self.checkMsgPos("")
-	self.posWarning = append(self.posWarning, len(self.logThisStep))
-	self.logThisStep = append(self.logThisStep, fmt.Sprintf(self.pWarn+format, v...))
-	self.Unlock()
-}
-
-// Function creates log with info message.
-func (self *ZLogger) Info(format string, v ...interface{}) {
-	self.Lock()
-	self.checkMsgPos(firstInfoMsg + format)
-	self.logThisStep = append(self.logThisStep, fmt.Sprintf(prefixInfo+format, v...))
-	self.Unlock()
-}
-
-// Function Step analysys previous step message.
-// When there are no warning or error in the block,
-// Step always deletes unsaved logs. It saves only
-// previous step head with suffix [OK].
-// When error is in the block,
-// Step always saves all logs.
-// When warning is in the block,
-// Step saves logs, that were written before warning message.
-// Number of this logs euivalents warningLen.
-
-func (self *ZLogger) Step(format string, v ...interface{}) {
-	self.Lock()
-	self.linesAlloc += len(self.logThisStep)
-
-	// When error is in the block...
-	if self.flagError == true {
-		// add suffix to step name, copy all logs, clear self variable.
-		self.logThisStep[0] = fmt.Sprintf(suffixFormat, self.logThisStep[0], self.sErr)
-		self.stringRes = append(self.stringRes, self.logThisStep...)
-		self.clearStep()
-	}
-
-	// When warning is in the block...
-	if len(self.posWarning) > 0 {
-		var nfirst, nlast int
-		// add suffix to step name
-		self.stringRes = append(self.stringRes, fmt.Sprintf(suffixFormat, self.logThisStep[0], self.sWarn))
-		for _, pos := range self.posWarning {
-			if pos-self.warningLen < nlast {
-				nfirst = nlast + 1
-			} else {
-				nfirst = pos - self.warningLen
-			}
-			// copy selected logs
-			self.stringRes = append(self.stringRes, self.logThisStep[nfirst:pos+1]...)
-			nlast = pos
+		if name := value.String(); len(name) > 0 {
+			zl.OutSource = name
+			return zl
 		}
-		// clear self variable and return memory to OS.
-		self.clearStep()
 	}
+	zl.OutSource = reserveLogFile
+	return zl
+}
 
-	// When there are no warning or error in the block...
-	if len(self.logThisStep) > 0 {
-		// add suffix to step name, clear self variable.
-		self.stringRes = append(self.stringRes, fmt.Sprintf(suffixFormat, self.logThisStep[0], self.sOK))
-		self.clearStep()
+func (self *ZL) NewStep(format string, v ...interface{}) *ZL {
+	root := self.goRoot()
+	root.Lock()
+	newNode := self.clone()
+	n := newNode.savePoint()
+	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixStep+format, v...))
+	root.Unlock()
+	return newNode
+}
+
+func (self *ZL) Step(format string, v ...interface{}) {
+	root := self.goRoot()
+	root.Lock()
+	n := self.key
+	if root.removeBeforeGet {
+		self.compress()
 	}
-
-	// clear self variable and return to OS.
-	if self.linesAlloc > linesToFreeOsMem {
-		runtime.GC()
-		debug.FreeOSMemory()
-		self.linesAlloc = 0
-
-	}
-	self.notFirstMsg = true
-	// append step name
-	self.logThisStep = append(self.logThisStep, fmt.Sprintf(lineSep+format, v...))
-	self.Unlock()
+	_ = root.processChild(n)
+	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixStep+format, v...))
+	root.Unlock()
 	return
 }
 
-// Step creates new Step, and return himself(for compatibility).
-//func (self *ZLogger) Step(format string, v ...interface{}) *ZLogger {
-//	self.Step(fmt.Sprintf(format, v...))
-//	return self
-//}
-
-// This clearStep method deletes all unsaved logs.
-// Metod clears all flags.
-// Variable warningLen desn't change only.
-func (self *ZLogger) clearStep() {
-
-	self.flagError = false
-	self.notFirstMsg = false
-	self.posWarning = []int{}
-	self.logThisStep = []string{}
+func (self *ZL) Info(format string, v ...interface{}) {
+	root := self.goRoot()
+	root.Lock()
+	n := self.savePoint()
+	// when msgs coount == 0
+	if len(root.logs[n]) == 0 {
+		format = lineSep + "Unknown step: " + format
+		root.logs[n] = append(root.logs[n], fmt.Sprintf(format, v...))
+	}
+	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixInfo+format, v...))
+	root.Unlock()
 }
 
-// GetLog gets string slice of all logs copied by Step function.
-// After that, it removes all logs from memory.
-// GetLog saves only argument warningLen.
-func (self *ZLogger) GetLog() (msgs []string) {
+func (self *ZL) Warning(format string, v ...interface{}) {
+	root := self.goRoot()
+	root.Lock()
+	n := self.savePoint()
+	self.warningPls = append(self.warningPls, len(root.logs[n]))
+	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixWarning+format, v...))
+	root.Unlock()
+}
 
-	self.Step("")
-	msgs = self.stringRes
-	self.clearStep()
-	self.stringRes = []string{}
-	//	runtime.GC()
-	//	debug.FreeOSMemory()
-	return msgs
+func (self *ZL) Error(format string, v ...interface{}) {
+	root := self.goRoot()
+	root.Lock()
+	n := self.savePoint()
+	self.errorPls = append(self.errorPls, len(root.logs[n]))
+	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixError+format, v...))
+	root.Unlock()
+}
+
+func (self *ZL) GetStep() string {
+	return self.getLog()
+}
+
+func (self *ZL) GetAllLog() string {
+	root := self.goRoot()
+	return root.getLog()
+}
+
+func (self *ZL) getLog() string {
+	root := self.goRoot()
+	root.Lock()
+	msgs := []string{}
+
+	if self.isRoot {
+		if root.removeBeforeGet {
+			root.compressAll()
+		}
+		// get all by sorted keys
+		keys := []int{}
+		for key := range root.children {
+			keys = append(keys, key)
+		}
+		sort.Ints(keys)
+		for _, key := range keys {
+			_ = root.processChild(key)
+			if msg, e := root.storage[key]; e == true {
+				msgs = append(msgs, msg)
+				root.storage[key] = string("")
+			}
+		}
+	} else { // get by one key
+		key := self.key
+		if root.removeBeforeGet {
+			self.compress()
+		}
+		msg, e := root.storage[key]
+		if e == true {
+			msgs = append(msgs, msg)
+			root.storage[key] = string("")
+		}
+	}
+
+	defer debug.FreeOSMemory()
+	defer runtime.GC()
+
+	root.Unlock()
+	return strings.Join(msgs, "")
+}
+
+// Checks logs on attentions messages.
+// If *ZL don't contains logs with attentions,
+// removes logs.
+func (self *ZL) compress() {
+
+	n := self.key
+	// check on attentions.
+	withoutAttention := len(self.errorPls) == 0 && len(self.warningPls) == 0
+	root := self.goRoot()
+	// means no errors, warnings and the storage is empty
+	if withoutAttention && len(root.storage[n]) == 0 {
+		root.logs[self.key] = []string{}
+		//		delete(root.children, n)
+		//		delete(root.logs, n)
+		//		delete(root.storage, n)
+	}
+}
+
+// Do like compress
+func (self *ZL) compressAll() {
+	root := self.goRoot()
+	for _, zl := range root.children {
+		zl.compress()
+	}
+	return
+}
+
+func (self *ZL) SetWarningLines(n int) {
+	self.goRoot().warningLines = n
+}
+
+func (self *ZL) SetRemoveBeforeGet(s bool) {
+	self.goRoot().removeBeforeGet = s
+}
+
+func (self *ZL) goRoot() *ZL {
+	if !self.isRoot {
+		return self.parent
+	}
+	return self
+}
+
+func (self *ZL) clone() *ZL {
+	theParent := self.goRoot()
+	theParent.nextKey++
+	key := theParent.nextKey
+	// create child
+	newNode := &ZL{
+		parent: theParent,
+		key:    key,
+	}
+	theParent.logs[key] = []string{}
+	theParent.storage[key] = string("")
+	theParent.children[key] = newNode
+	return newNode
+}
+
+// returns range of lines, what should be saved with Warning log
+func getRange(warningPls []int, warningLines int) (pairs []pair) {
+	var saved, begin int
+	for _, p := range warningPls {
+		if p-warningLines < saved {
+			begin = saved + 1
+		} else {
+			begin = p - warningLines
+		}
+		pairs = append(pairs, pair{begin, p + 1})
+		saved = p
+	}
+	return pairs
+}
+
+// moves important msgs from logs to storage
+// returns moveing code.
+func (root *ZL) processChild(n int) bool {
+
+	if !root.isRoot {
+		root = root.goRoot()
+	}
+	// there are no logs
+	if len(root.logs[n]) == 0 {
+		return false
+	}
+	// check error existence
+	if len(root.children[n].errorPls) != 0 {
+		// make step header
+		root.storage[n] += fmt.Sprintf(suffixFormat, root.logs[n][0], suffixError)
+		// copy data to the storage
+		root.storage[n] += strings.Join(root.logs[n][1:], lineSep)
+		// claear logs
+		root.logs[n] = []string{}
+		root.children[n].errorPls = []int{}
+		root.children[n].warningPls = []int{}
+		return true
+	}
+	// check warning existence
+	if len(root.children[n].warningPls) != 0 {
+		// save step header
+		root.storage[n] += fmt.Sprintf(suffixFormat, root.logs[n][0], suffixWarning)
+		// get lines ranges to save
+		saveRange := getRange(root.children[n].warningPls, root.warningLines)
+		msgs := []string{}
+		// join lines in blocks
+		for _, pairs := range saveRange {
+			s, e := pairs.begin, pairs.end
+			msgs = append(msgs, strings.Join(root.logs[n][s:e], lineSep))
+		}
+		// join all blocks in one string
+		root.storage[n] += strings.Join(msgs, lineSep)
+		// clear logs
+		root.logs[n] = []string{}
+		root.children[n].warningPls = []int{}
+		return true
+	}
+	// at the end, if all OK. I make step header:
+	root.storage[n] += fmt.Sprintf(suffixFormat, root.logs[n][0], suffixOK)
+	// clear logs
+	root.logs[n] = []string{}
+	return false
+}
+
+// returns key for logs & storage.
+func (self *ZL) savePoint() int {
+	saveKey := self.key
+	root := self.goRoot()
+
+	// when is used root as enter point
+	if saveKey == 0 {
+		// and root has not children
+		if len(root.children) == 0 {
+			// add new step
+			_ = self.NewStep("Unknown New step")
+			fmt.Println("savePoint: Unknown New step!")
+		}
+		// search first child key
+		for key := range self.children {
+			saveKey = key
+			fmt.Println("savePoint: KEY from cycle!!!", key)
+			break
+		}
+	}
+	return saveKey
 }
 
 // append logs to the file
-func (self *ZLogger) WriteLog() (n int, err error) {
-	outPath := self.OutSource
+func (self *ZL) WriteAllLog() (n int, err error) {
+	outPath := self.goRoot().OutSource
 	// verify file existence
 	if _, err = os.Stat(outPath); err == nil {
-		return self.writeFile("add")
+		return self.writeFile(self.GetAllLog(), "add")
 	}
-	err = dirPrepare(outPath)
-	if err == nil {
-		return self.writeFile("rewrite")
-	}
-	// if can't create dir, writeFile should write ReserveFile.
-	return self.writeFile("rewrite")
+	_ = dirPrepare(outPath)
+	return self.writeFile(self.GetAllLog(), "rewrite")
 }
 
-// creates new file and write into it
-func (self *ZLogger) ReWriteLog() (n int, err error) {
-	err = dirPrepare(self.OutSource)
-	return self.writeFile("rewrite")
+// append logs to the file
+func (self *ZL) WriteStep() (n int, err error) {
+	outPath := self.goRoot().OutSource
+	// verify file existence
+	if _, err = os.Stat(outPath); err == nil {
+		return self.writeFile(self.GetStep(), "add")
+	}
+	_ = dirPrepare(outPath)
+	return self.writeFile(self.GetStep(), "rewrite")
+}
+
+// creates new file and write start line into it.
+func (self *ZL) CreateLogFile() (n int, err error) {
+	err = dirPrepare(self.goRoot().OutSource)
+	startLine := fmt.Sprintf(endOutputLine, time.Now())[:65] + lineSep
+	return self.writeFile(startLine, "rewrite")
 }
 
 // makes dir and waits until it is has been created
@@ -248,7 +354,7 @@ func dirPrepare(outPath string) (err error) {
 	err = os.MkdirAll(dir, 0777)
 	// waiting for the dir creating
 	if err == nil {
-		for attempt := 0; attempt < 10; attempt++ {
+		for attempt := 0; attempt < 20; attempt++ {
 			if _, err = os.Stat(dir); err == nil {
 				return nil
 			}
@@ -259,59 +365,35 @@ func dirPrepare(outPath string) (err error) {
 
 // writeFile should write result into outSource,
 // if it can't open it, writeFile should write into ReserveFile.
-func (self *ZLogger) writeFile(operation string) (n int, err error) {
-	logs := self.GetLog()
+func (self *ZL) writeFile(logs, operation string) (n int, err error) {
+	//	logs := self.GetAllLog()
 	var outFile *os.File
-
+	fileName := self.goRoot().OutSource
 	switch operation {
 	case "rewrite":
-		outFile, err = os.Create(self.OutSource)
+		outFile, err = os.Create(fileName)
+		//		fmt.Println("reWrite", err, fileName)
 	case "add":
-		outFile, err = os.OpenFile(self.OutSource, os.O_APPEND|os.O_WRONLY, 0600)
+		outFile, err = os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0600)
 	}
-
 	// if fail to write, try to write into ReserveFile.
 	if err != nil {
-		outFile, err = os.OpenFile(self.ReserveFile, os.O_APPEND|os.O_WRONLY, 0600)
+		outFile, err = os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
-			outFile, err = os.Create(self.ReserveFile)
+			outFile, err = os.Create(fileName)
 			if err != nil {
-				return n, err
+				return 0, err
 			}
 		}
 
 	}
 	defer outFile.Close()
-	fmt.Printf("\nLogs is writing into '%s'...", outFile.Name())
-	for _, log := range logs {
-		w, err := outFile.WriteString(log)
-		n += w
-		if err != nil {
-			fmt.Print(err)
-			return n, err
-		}
+	fmt.Printf("Logs is writing into '%s'...", outFile.Name())
+	w, err := outFile.WriteString(logs)
+	if err != nil {
+		//		fmt.Print(err)
+		return 0, err
 	}
-	fmt.Printf("%d bytes. Done.\n", n)
-	endLine := fmt.Sprintf(endOutputLine, time.Now())
-	_, _ = outFile.WriteString(endLine)
-	return n, nil
-}
-
-//func (self *ZLogger) GetAllLog() (msgs []string) {
-//	return self.GetLog()
-//}
-
-// Method checks Step creation. If msg position is first,
-// this method creates and saves name for Step.
-func (self *ZLogger) checkMsgPos(msg string) {
-	if !self.notFirstMsg {
-		// add first message.
-		self.logThisStep = append(self.logThisStep, fmt.Sprintf(unknownStepName, msg))
-		self.notFirstMsg = true
-	}
-}
-
-// Function set  warningLen.
-func (self *ZLogger) SetWarningLenght(n int) {
-	self.warningLen = n
+	fmt.Printf("%d bytes. Done.\n", w)
+	return w, nil
 }

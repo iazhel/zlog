@@ -31,13 +31,13 @@ func (self tTask) printInfo() {
 }
 
 func (self tTask) Control(t *testing.T, pass bool, get int, mem runtime.MemStats) {
-	OK, ERR := "      "+suffixOK, " "+suffixError
+	OK, ERR := "      [\033[32mOK\033[0m]", " "+"[ \033[31mERROR\033[0m ]"
 	if curOS := runtime.GOOS; curOS == "windows" {
 		OK, ERR = "[OK]", "[Error]"
 	}
 
 	if !pass {
-		fmt.Printf("%10s|%10d\n\b", ERR, get)
+		fmt.Printf("%10s|%10d|", ERR, get)
 		memPrint(mem)
 		t.Error("Getted messages count is not correct. ")
 
@@ -65,33 +65,37 @@ func (self tTask) writeControl(t *testing.T, pass error, want, nBytes int, mem r
 // skip test if it is huge.
 func checkShortMode(t *testing.T, msgsWant, limit int) {
 	if msgsWant > limit {
+		//		t.Skip("Skipping huge test in short mode")
 		if testing.Short() {
 			t.Skip("Skipping huge test in short mode")
 		} else {
-			fmt.Print("\n\b Huge test is started. It take about minute. \n\bUse '-test.short' flag to skip.  ")
+			fmt.Print("\n\b Huge test is started. It take about minute. \n\bUse '-test.short' flag to skip.")
 		}
 	}
 }
-
-// It is working routine.
-func (task tTask) Do(t *testing.T, log *ZLogger, f0, f1, f2, f3 func(string, ...interface{})) {
+func (task tTask) Do_A(t *testing.T) {
 	var ops int32 = 0
 	ch := make(chan bool)
 	// running routines
-	log.Step("Step 1")
+	log := make([]*ZL, task.routCount)
+	log[0] = NewZL()
+	log[0].SetRemoveBeforeGet(true)
+
 	for rc := 0; rc < task.routCount; rc++ {
 		go func(n int) {
-			f0("Start routine %d", n)
+			//			log[n] = log[0].NewStep("NewStep %d", n)
+			log[n] = log[0].NewStep("Step")
+			//			fmt.Println("n=", n, "rc=", rc)
 			for j := 0; j < task.loopDeep; j++ {
-				f1(`In the loop.------------------------------------------------------------------------------------`)
+				log[n].Info(`In the loop.-----------------------------------------------------------------------`)
 			}
-			f2("End of goroutine %d.", rc)
+			log[n].Error("End of goroutine")
 			// increase counter at goroutine end.
 			atomic.AddInt32(&ops, 1)
 			runtime.Gosched()
 			// find the last goroutine.
 			if atomic.LoadInt32(&ops) == int32(task.routCount) {
-				f3("Last test message!")
+				log[0].Error("Last test message!")
 				ch <- true
 			}
 		}(rc)
@@ -104,14 +108,65 @@ func (task tTask) Do(t *testing.T, log *ZLogger, f0, f1, f2, f3 func(string, ...
 	// result control or writing.
 	switch task.operation {
 	case "get":
-		msgsCount := len(log.GetLog())
+		msgs := log[0].GetAllLog()
+		//		fmt.Println(msgs)
+		msgsCount := len(msgs)
 		pass := msgsCount >= task.msgsWant
 		task.Control(t, pass, msgsCount, mem)
 	case "write":
-		nBytes, pass := log.WriteLog()
+		//		nBytes, pass := log[0].WriteLog()
+		//		task.writeControl(t, pass, task.msgsWant, nBytes, mem)
+	case "rewrite":
+		//		nBytes, pass := log[0].ReWriteLog()
+		//		task.writeControl(t, pass, task.msgsWant, nBytes, mem)
+
+	}
+}
+
+func (task tTask) Do_1(t *testing.T) {
+	var ops int32 = 0
+	ch := make(chan bool)
+	// running routines
+	log := NewZL()
+	log.SetRemoveBeforeGet(true)
+
+	for rc := 0; rc < task.routCount; rc++ {
+		go func(n int) {
+			log = log.NewStep("Step")
+			//			fmt.Println("n=", n, "rc=", rc)
+			for j := 0; j < task.loopDeep; j++ {
+				log.Info(`In the loop.-----------------------------------------------------------------------`)
+			}
+			log.Error("End of goroutine")
+			// increase counter at goroutine end.
+			atomic.AddInt32(&ops, 1)
+			//	runtime.Gosched()
+			// find the last goroutine.
+			if atomic.LoadInt32(&ops) == int32(task.routCount) {
+				log.Error("Last test message!")
+				ch <- true
+			}
+		}(rc)
+	}
+	// wait last routine signal.
+	<-ch
+	// do memory print.
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	// result control or writing.
+	switch task.operation {
+	case "get":
+		msgs := log.GetAllLog()
+		//		fmt.Println(msgs)
+		msgsCount := len(msgs)
+		pass := msgsCount >= task.msgsWant
+		task.Control(t, pass, msgsCount, mem)
+	case "write":
+		nBytes, pass := log.WriteAllLog()
 		task.writeControl(t, pass, task.msgsWant, nBytes, mem)
 	case "rewrite":
-		nBytes, pass := log.ReWriteLog()
+		log.CreateLogFile()
+		nBytes, pass := log.WriteAllLog()
 		task.writeControl(t, pass, task.msgsWant, nBytes, mem)
 
 	}
@@ -126,25 +181,31 @@ func tableHeader() {
 func Test_Error__method(t *testing.T) {
 	taskCases := []tTask{
 		//{routCount, loopDeep, msgsWant(will recalculate)}
+		// light
 		{1, 100000, 0, "get"},
 		{10, 10000, 0, "get"},
+		// huge
+		{100000, 30, 0, "write"},
+		{100000, 40, 0, "write"},
+		// standart
 		{100, 1000, 0, "get"},
 		{1000, 100, 0, "write"},
 		{10000, 10, 0, "rewrite"},
-		{1000, 1000, 0, "get"},
+		{100000, 1, 0, "write"},
 	}
 	tableHeader()
 	for _, task := range taskCases {
 		task.msgsWant = task.routCount*task.loopDeep + 2*task.routCount + 2
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000000)
-		log := NewZLog("/tmp/go_tests/test1.log")
-
-		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
-		task.Do(t, log, log.Info, log.Info, log.Info, log.Error)
+		task.Do_1(t)
+		task.printInfo()
+		checkShortMode(t, task.msgsWant, 1000000)
+		task.Do_A(t)
 	}
 }
 
+/*
 // Should get Warning messages and control it min count.
 func Test_Warning_method(t *testing.T) {
 	taskCases := []tTask{
@@ -159,15 +220,15 @@ func Test_Warning_method(t *testing.T) {
 		task.msgsWant = task.routCount*2 + 2
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000000)
-		log := NewZLog("/tmp/go_tests/test2.log")
+		log := NewZL("/tmp/go_tests/test2.log")
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
-		task.Do(t, log, log.Step, log.Info, log.Warning, log.Info)
+		task.Do(t, log, log.NewStep, log.Info, log.Warning, log.Info)
 	}
 }
 
 // All steps messages must be saved. It count is routines count.
 // Should return memory to programm.
-func Test_Step_method(t *testing.T) {
+func Test_NewStep_method(t *testing.T) {
 	taskCases := []tTask{
 		//{routCount, loopDeep}
 		{1, 1000000, 0, "write"},
@@ -180,10 +241,10 @@ func Test_Step_method(t *testing.T) {
 		task.msgsWant = task.routCount + 1
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000)
-		log := NewZLog()
+		log := NewZL()
 
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
-		task.Do(t, log, log.Step, log.Info, log.Info, log.Info)
+		task.Do(t, log, log.NewStep, log.Info, log.Info, log.Info)
 	}
 }
 
@@ -205,7 +266,7 @@ func Test_Error_Heap(t *testing.T) {
 		task.msgsWant = task.routCount + 1
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000)
-		log := NewZLog()
+		log := NewZL()
 
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
 		task.Do(t, log, log.Info, log.Info, log.Info, log.Error)
@@ -213,10 +274,10 @@ func Test_Error_Heap(t *testing.T) {
 
 }
 
-// All Steps messages must be saved into file.
+// All NewSteps messages must be saved into file.
 // Test should return memory to OS after finish.
 // Free OS memory should be increased.
-func Test_Steps_Heap(t *testing.T) {
+func Test_NewSteps_Heap(t *testing.T) {
 	taskCases := []tTask{
 		//{routCount, loopDeep}
 		{1, 100000, 0, "get"},
@@ -230,16 +291,15 @@ func Test_Steps_Heap(t *testing.T) {
 		task.msgsWant = task.routCount + 1
 		task.printInfo()
 		checkShortMode(t, task.msgsWant, 1000)
-		log := NewZLog()
+		log := NewZL()
 
 		// Do( .., .., at start routine, in loop, at end each routine, at end of all)
-		task.Do(t, log, log.Step, log.Info, log.Info, log.Info)
+		task.Do(t, log, log.NewStep, log.Info, log.Info, log.Info)
 	}
 }
-
 // A huge test for OS memory. All error messages must be saved.
 //It count is more then routines*loops + 1.
-func Test_GetLog_Heap(t *testing.T) {
+func Test_GetAllLog_Heap(t *testing.T) {
 	taskCases := []tTask{
 		//{routCount, loopDeep}
 		{1, 100000, 0, "get"},
@@ -254,8 +314,8 @@ func Test_GetLog_Heap(t *testing.T) {
 		checkShortMode(t, task.msgsWant, 333000)
 		var ops, msgsGet int32 = 0, 0
 		ch := make(chan bool)
-		log := NewZLog()
-		log.Step("Step 1")
+		log := NewZL()
+		log.NewStep("NewStep 1")
 		for rc := 0; rc < task.routCount; rc++ {
 			go func(n int) {
 				for j := 0; j < task.loopDeep; j++ {
@@ -264,7 +324,7 @@ func Test_GetLog_Heap(t *testing.T) {
 				}
 				runtime.Gosched()
 				//		log.Error("Last message is test error.")
-				l := int32(len(log.GetLog()))
+				l := int32(len(log.GetAllLog()))
 				atomic.AddInt32(&msgsGet, l)
 				atomic.AddInt32(&ops, 1)
 				if atomic.LoadInt32(&ops) == int32(task.routCount) {
@@ -275,7 +335,7 @@ func Test_GetLog_Heap(t *testing.T) {
 		<-ch
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
-		atomic.AddInt32(&msgsGet, int32(len(log.GetLog())))
+		atomic.AddInt32(&msgsGet, int32(len(log.GetAllLog())))
 		msgsCountInt := int(atomic.LoadInt32(&msgsGet))
 		pass := task.msgsWant <= msgsCountInt
 		task.Control(t, pass, msgsCountInt, mem)
@@ -283,3 +343,5 @@ func Test_GetLog_Heap(t *testing.T) {
 	}
 	fmt.Println()
 }
+
+*/
