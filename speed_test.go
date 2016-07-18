@@ -1,7 +1,6 @@
 package zlog
 
 import (
-	//	"fmt"
 	"testing"
 )
 

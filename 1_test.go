@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const InfoLogMsg = "info:------------------------------------------------------"
+const InfoLogMsg = "info:----------------------------------------------------"
 
 func checkTest(t *testing.T, b bool, s string) {
 	if !b {

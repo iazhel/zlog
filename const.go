@@ -11,7 +11,7 @@ const (
 
 	//	reserveLogFile_Win = "C:\\go_test.log"
 	prefixInfo      = "     [info]: "
-	endOutputLine   = "\r\n################ Zlog session ################ %s"
+	endOutputLine   = "\r\n################ Zlog session ############### %s"
 	unknownStepName = "Unknown step%s"
 	firstInfoMsg    = ", first msg: "
 	prefixStep      = lineSep

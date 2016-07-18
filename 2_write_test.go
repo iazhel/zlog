@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
-	//	"runtime"
-	//	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func deleteIfExist(name string) error {

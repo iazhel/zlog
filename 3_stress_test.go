@@ -1,4 +1,3 @@
-// USE -test.v flag to see output at PASS.
 // USE -test.short flag to skip huge tests.
 
 package zlog
