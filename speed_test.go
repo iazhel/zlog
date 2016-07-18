@@ -4,14 +4,14 @@ import (
 	"testing"
 )
 
-func Benchmark_Step_100x1000Info(b *testing.B)    { bench_Step(100, b) }
-func Benchmark_StepMap_100x1000Info(b *testing.B) { bench_StepM(100, b) }
-func Benchmark_Info_1000(b *testing.B)            { bench_info(1000, b) }
+func Benchmark_Step_100x1000Info(b *testing.B)       { bench_Step(100, b) }
+func Benchmark_Step_Mutex_100x1000Info(b *testing.B) { bench_StepM(100, b) }
 
-//func Benchmark_Info_100000(b *testing.B)          { bench_info(100000, b) }
-func Benchmark_InfoMap_1000(b *testing.B) { bench_infoM(1000, b) }
+func Benchmark_Info_1000(b *testing.B)       { bench_info(1000, b) }
+func Benchmark_Info_Mutex_1000(b *testing.B) { bench_infoM(1000, b) }
 
-//func Benchmark_InfoMap_100000(b *testing.B)       { bench_infoM(100000, b) }
+func Benchmark_Info_100000(b *testing.B)       { bench_info(100000, b) }
+func Benchmark_Info_Mutex_100000(b *testing.B) { bench_infoM(100000, b) }
 
 func bench_info(n int, b *testing.B) {
 	log := NewZLA()
@@ -19,6 +19,7 @@ func bench_info(n int, b *testing.B) {
 		for j := 0; j < n; j++ {
 			log.Info("Step 1 -------------------------------------------------")
 		}
+		_ = log.GetAllLog()
 	}
 }
 
@@ -29,6 +30,7 @@ func bench_infoM(n int, b *testing.B) {
 		for j := 0; j < n; j++ {
 			log1.Info("Step 1 -------------------------------------------------")
 		}
+		_ = log.GetAllLog()
 	}
 }
 

@@ -1,9 +1,11 @@
 package zlog
 
+/*
 import (
 	"fmt"
 	"math"
 	"time"
+	"github.com/iazhel/zlog"
 )
 
 func routine(n int, log *ZL) {
@@ -48,3 +50,5 @@ func main() {
 	log[0].WriteAllLog()
 	fmt.Println("END")
 }
+*/
+//
