@@ -33,7 +33,6 @@ type ZL struct {
 	nextKey    int              //
 	children   map[int]*ZL      // pointers to childs
 	logs       map[int][]string // current logs place
-	//	logsCounter        map[int]int      // logs counter
 	storage         map[int]string // storage of comresed steps.
 	warningPls      []int          // log positions what contains warnings
 	errorPls        []int          // log positions what contains errors
@@ -72,19 +71,21 @@ func (self *ZL) NewStep(format string, v ...interface{}) *ZL {
 	root := self.goRoot()
 	root.Lock()
 	newNode := self.clone()
-	n := newNode.savePoint()
+	n := newNode.key
 	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixStep+format, v...))
 	root.Unlock()
+	self = newNode
 	return newNode
 }
 
 func (self *ZL) Step(format string, v ...interface{}) {
 	root := self.goRoot()
-	root.Lock()
 	n := self.key
+	root.Lock()
 	if root.removeBeforeGet {
 		self.compress()
 	}
+	n = self.key
 	_ = root.processChild(n)
 	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixStep+format, v...))
 	root.Unlock()
@@ -94,12 +95,7 @@ func (self *ZL) Step(format string, v ...interface{}) {
 func (self *ZL) Info(format string, v ...interface{}) {
 	root := self.goRoot()
 	root.Lock()
-	n := self.savePoint()
-	// when msgs coount == 0
-	if len(root.logs[n]) == 0 {
-		format = lineSep + "Unknown step: " + format
-		root.logs[n] = append(root.logs[n], fmt.Sprintf(format, v...))
-	}
+	n := self.key
 	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixInfo+format, v...))
 	root.Unlock()
 }
@@ -107,7 +103,7 @@ func (self *ZL) Info(format string, v ...interface{}) {
 func (self *ZL) Warning(format string, v ...interface{}) {
 	root := self.goRoot()
 	root.Lock()
-	n := self.savePoint()
+	n := self.key
 	self.warningPls = append(self.warningPls, len(root.logs[n]))
 	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixWarning+format, v...))
 	root.Unlock()
@@ -116,7 +112,7 @@ func (self *ZL) Warning(format string, v ...interface{}) {
 func (self *ZL) Error(format string, v ...interface{}) {
 	root := self.goRoot()
 	root.Lock()
-	n := self.savePoint()
+	n := self.key
 	self.errorPls = append(self.errorPls, len(root.logs[n]))
 	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixError+format, v...))
 	root.Unlock()
@@ -135,31 +131,32 @@ func (self *ZL) getLog() string {
 	root := self.goRoot()
 	root.Lock()
 	msgs := []string{}
+	keys := []int{}
 
 	if self.isRoot {
-		if root.removeBeforeGet {
-			root.compressAll()
-		}
 		// get all by sorted keys
-		keys := []int{}
+		keys = append(keys, 0)
 		for key := range root.children {
 			keys = append(keys, key)
 		}
 		sort.Ints(keys)
-		for _, key := range keys {
-			_ = root.processChild(key)
-			if msg, e := root.storage[key]; e == true {
-				msgs = append(msgs, msg)
-				root.storage[key] = string("")
-			}
+		if root.removeBeforeGet {
+			root.compressAll()
 		}
-	} else { // get by one key
+
+	} else {
+		// get by one key
 		key := self.key
+		keys = append(keys, key)
 		if root.removeBeforeGet {
 			self.compress()
 		}
-		msg, e := root.storage[key]
-		if e == true {
+	}
+
+	for _, key := range keys {
+		_ = root.processChild(key)
+		// check map on key existense
+		if msg, e := root.storage[key]; e == true {
 			msgs = append(msgs, msg)
 			root.storage[key] = string("")
 		}
@@ -173,10 +170,9 @@ func (self *ZL) getLog() string {
 }
 
 // Checks logs on attentions messages.
-// If *ZL don't contains logs with attentions,
+// If *ZL do not contains logs with attentions,
 // removes logs.
 func (self *ZL) compress() {
-
 	n := self.key
 	// check on attentions.
 	withoutAttention := len(self.errorPls) == 0 && len(self.warningPls) == 0
@@ -190,7 +186,6 @@ func (self *ZL) compress() {
 	}
 }
 
-// Do like compress
 func (self *ZL) compressAll() {
 	root := self.goRoot()
 	for _, zl := range root.children {
@@ -245,34 +240,42 @@ func getRange(warningPls []int, warningLines int) (pairs []pair) {
 }
 
 // moves important msgs from logs to storage
-// returns moveing code.
+// returns code.
 func (root *ZL) processChild(n int) bool {
+	var ePls, wPls *[]int
 
-	if !root.isRoot {
+	if n == 0 {
+		ePls = &root.errorPls
+		wPls = &root.warningPls
+	} else {
 		root = root.goRoot()
+		ePls = &root.children[n].errorPls
+		wPls = &root.children[n].warningPls
 	}
+
 	// there are no logs
 	if len(root.logs[n]) == 0 {
 		return false
 	}
+
 	// check error existence
-	if len(root.children[n].errorPls) != 0 {
+	if len(*ePls) != 0 {
 		// make step header
-		root.storage[n] += fmt.Sprintf(suffixFormat, root.logs[n][0], suffixError)
+		root.makeCaption(n, suffixError)
 		// copy data to the storage
 		root.storage[n] += strings.Join(root.logs[n][1:], lineSep)
 		// claear logs
 		root.logs[n] = []string{}
-		root.children[n].errorPls = []int{}
-		root.children[n].warningPls = []int{}
+		*ePls = []int{}
+		*wPls = []int{}
 		return true
 	}
 	// check warning existence
-	if len(root.children[n].warningPls) != 0 {
+	if len(*wPls) != 0 {
 		// save step header
-		root.storage[n] += fmt.Sprintf(suffixFormat, root.logs[n][0], suffixWarning)
+		root.makeCaption(n, suffixWarning)
 		// get lines ranges to save
-		saveRange := getRange(root.children[n].warningPls, root.warningLines)
+		saveRange := getRange(*wPls, root.warningLines)
 		msgs := []string{}
 		// join lines in blocks
 		for _, pairs := range saveRange {
@@ -283,37 +286,22 @@ func (root *ZL) processChild(n int) bool {
 		root.storage[n] += strings.Join(msgs, lineSep)
 		// clear logs
 		root.logs[n] = []string{}
-		root.children[n].warningPls = []int{}
+		*wPls = []int{}
 		return true
 	}
 	// at the end, if all OK. I make step header:
-	root.storage[n] += fmt.Sprintf(suffixFormat, root.logs[n][0], suffixOK)
+	root.makeCaption(n, suffixOK)
 	// clear logs
 	root.logs[n] = []string{}
 	return false
 }
 
-// returns key for logs & storage.
-func (self *ZL) savePoint() int {
-	saveKey := self.key
-	root := self.goRoot()
-
-	// when is used root as enter point
-	if saveKey == 0 {
-		// and root has not children
-		if len(root.children) == 0 {
-			// add new step
-			_ = self.NewStep("Unknown New step")
-			fmt.Println("savePoint: Unknown New step!")
-		}
-		// search first child key
-		for key := range self.children {
-			saveKey = key
-			fmt.Println("savePoint: KEY from cycle!!!", key)
-			break
-		}
+func (root *ZL) makeCaption(n int, suffix string) {
+	caption := root.logs[n][0]
+	if !strings.Contains(caption, prefixStep){
+		caption = prefixStep + caption
 	}
-	return saveKey
+	root.storage[n] += fmt.Sprintf(suffixFormat,caption, suffix)
 }
 
 // append logs to the file
@@ -372,7 +360,6 @@ func (self *ZL) writeFile(logs, operation string) (n int, err error) {
 	switch operation {
 	case "rewrite":
 		outFile, err = os.Create(fileName)
-		//		fmt.Println("reWrite", err, fileName)
 	case "add":
 		outFile, err = os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, 0600)
 	}
@@ -391,7 +378,6 @@ func (self *ZL) writeFile(logs, operation string) (n int, err error) {
 	fmt.Printf("Logs is writing into '%s'...", outFile.Name())
 	w, err := outFile.WriteString(logs)
 	if err != nil {
-		//		fmt.Print(err)
 		return 0, err
 	}
 	fmt.Printf("%d bytes. Done.\n", w)

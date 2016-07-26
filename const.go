@@ -4,15 +4,15 @@ const (
 
 	// Linux canvas
 	prefixWarning = "  [warning]: "
-	prefixError   = "  [error]: "
+	prefixError   = "  [error]  : "
 	suffixOK      = "[OK]" + lineSep
 	suffixWarning = "[WARNING]" + lineSep
 	suffixError   = "[ERROR]" + lineSep
 
-	prefixInfo      = "     [info]: "
+	prefixInfo      = "     [info]:"
 	endOutputLine   = "\r\n################ Zlog session ############### %s"
 	unknownStepName = "Unknown step%s"
-	prefixStep      = lineSep
+	prefixStep      = lineSep + "Step: "
 	suffixFormat    = "%-65s %s" // suffix format
 
 	/*

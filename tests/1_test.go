@@ -16,16 +16,55 @@ func checkTest(t *testing.T, b bool, s string) {
 func createAndFillZL(step, info int) []*ZL {
 	logs := make([]*ZL, step)
 	logs[0] = NewZL()
+//	logs[0].Step("Step")
+//	logs[0].Info("Info")
+
+
 	// NewStep cycle
 	for j := 0; j < step; j++ {
 		logs[j] = logs[0].NewStep("step")
 		// Info cycle
 		for k := 0; k < info; k++ {
 			logs[j].Info(InfoLogMsg)
+		//	logs[j].Step(InfoLogMsg)
 		}
 	}
 	return logs
 }
+
+func Test_Step(t *testing.T) {
+	log := NewZL()
+	log.NewStep("Step A")
+	log.Info("Info")
+	log.Error("EEEEEE")
+	fmt.Printf("%#v", log)
+	msgs := log.GetAllLog()
+	msgsSize := len(msgs)
+	fmt.Println(msgs)
+	checkTest(t, msgsSize == 1, "000.Logs are created: ")
+
+return
+	log = NewZL()
+	log.Step("Step B")
+	log.Error("Error 2 !")
+
+	msgs = log.GetAllLog()
+	msgsSize = len(msgs)
+	fmt.Println(msgs)
+	checkTest(t, msgsSize == 2, "000.Logs are created: ")
+
+	log = NewZL()
+	log.Step("Step C")
+	log.Warning("Warning 3 !")
+
+	msgs = log.GetAllLog()
+	msgsSize = len(msgs)
+	fmt.Println(msgs)
+	checkTest(t, msgsSize == 2, "000.Logs are created: ")
+
+
+}
+
 
 func Test_GetLog_clear(t *testing.T) {
 	steps, infos := 10, 1000
