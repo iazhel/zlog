@@ -14,29 +14,36 @@ import (
 )
 
 const (
-	// LINUX
-	//lineSep        = "\n"
 	reserveLogFile = "/tmp/zlog_autosave.log"
+)
 
-	// WINDOWS
-	lineSep = "\r\n"
-	//reserveLogFile = "c:\\zlog_autosave.log"
+var (
+	linesSep      = "\r\n"
+	prefixWarning = "  [warning]: "
+	prefixError   = "  [error]  : "
+	suffixOK      = "[OK]" + linesSep
+	suffixWarning = "[WARNING]" + linesSep
+	suffixError   = "[ERROR]" + linesSep
 
+	prefixInfo    = "     [info]:"
+	endOutputLine = "\r\n################ Zlog session ############### %s"
+	prefixStep    = linesSep + "Step: "
+	suffixFormat  = "%-65s %s" // suffix format
 )
 
 // chain relationship implementing
 type ZL struct {
-	sync.Mutex //
-	isRoot     bool
-	parent     *ZL              // pointer to parent(root)
-	key        int              // key for map child
-	nextKey    int              //
-	children   map[int]*ZL      // pointers to childs
-	logs       map[int][]string // current logs place
-	storage         map[int]string // storage of comresed steps.
-	warningPls      []int          // log positions what contains warnings
-	errorPls        []int          // log positions what contains errors
-	warningLines    int            // number lines before warning to save
+	sync.Mutex      //
+	isRoot          bool
+	parent          *ZL              // pointer to parent(root)
+	key             int              // key for map child
+	nextKey         int              //
+	children        map[int]*ZL      // pointers to childs
+	logs            map[int][]string // current logs place
+	storage         map[int]string   // storage of comresed steps.
+	warningPls      []int            // log positions what contains warnings
+	errorPls        []int            // log positions what contains errors
+	warningLines    int              // number lines before warning to save
 	removeBeforeGet bool
 	OutSource       string
 	processed       bool
@@ -47,6 +54,19 @@ type pair struct {
 }
 
 func NewZL(out ...interface{}) *ZL {
+	curOS := runtime.GOOS
+	switch curOS {
+	case "linux":
+		linesSep = "\n"
+		prefixWarning = "  [\033[35mwarning\033[0m]: "
+		prefixError = "  [ \033[31merror\033[0m ]: "
+		suffixOK = "[\033[32mOK\033[0m]"// + linesSep
+		suffixWarning = "[\033[35mWARNING\033[0m]" + linesSep
+		suffixError = "[ \033[31mERROR\033[0m ]" + linesSep
+		prefixStep = linesSep + "Step: "
+//		prefixStep = "Step: "
+	}
+
 	zl := &ZL{
 		isRoot:          true,
 		removeBeforeGet: false,
@@ -263,7 +283,7 @@ func (root *ZL) processChild(n int) bool {
 		// make step header
 		root.makeCaption(n, suffixError)
 		// copy data to the storage
-		root.storage[n] += strings.Join(root.logs[n][1:], lineSep)
+		root.storage[n] += strings.Join(root.logs[n][1:], linesSep)
 		// claear logs
 		root.logs[n] = []string{}
 		*ePls = []int{}
@@ -280,10 +300,10 @@ func (root *ZL) processChild(n int) bool {
 		// join lines in blocks
 		for _, pairs := range saveRange {
 			s, e := pairs.begin, pairs.end
-			msgs = append(msgs, strings.Join(root.logs[n][s:e], lineSep))
+			msgs = append(msgs, strings.Join(root.logs[n][s:e], linesSep))
 		}
 		// join all blocks in one string
-		root.storage[n] += strings.Join(msgs, lineSep)
+		root.storage[n] += strings.Join(msgs, linesSep)
 		// clear logs
 		root.logs[n] = []string{}
 		*wPls = []int{}
@@ -298,10 +318,10 @@ func (root *ZL) processChild(n int) bool {
 
 func (root *ZL) makeCaption(n int, suffix string) {
 	caption := root.logs[n][0]
-	if !strings.Contains(caption, prefixStep){
+	if !strings.Contains(caption, prefixStep) {
 		caption = prefixStep + caption
 	}
-	root.storage[n] += fmt.Sprintf(suffixFormat,caption, suffix)
+	root.storage[n] += fmt.Sprintf(suffixFormat, caption, suffix)
 }
 
 // append logs to the file
@@ -329,7 +349,7 @@ func (self *ZL) WriteStep() (n int, err error) {
 // creates new file and write start line into it.
 func (self *ZL) CreateLogFile() (n int, err error) {
 	err = dirPrepare(self.goRoot().OutSource)
-	startLine := fmt.Sprintf(endOutputLine, time.Now())[:65] + lineSep
+	startLine := fmt.Sprintf(endOutputLine, time.Now())[:65] + linesSep
 	return self.writeFile(startLine, "rewrite")
 }
 

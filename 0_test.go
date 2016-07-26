@@ -3,8 +3,18 @@ package zlog
 import (
 	"fmt"
 	"testing"
+	//    "strings"
 )
 
+func generateLogn(n int) (msgs []string) {
+	for i := 0; i < n; i++ {
+		msg := fmt.Sprintf("%10d", i)
+		msgs = append(msgs, msg)
+		fmt.Println(msg)
+	}
+	return msgs
+
+}
 func Test_Step_0(t *testing.T) {
 	log := NewZL()
 	log.NewStep("001.        ")
@@ -21,23 +31,20 @@ func Test_Step_0(t *testing.T) {
 
 	msgs := log.GetAllLog()
 	//	msgs := log.GetStep()
-	fmt.Println("GetStep")
-	fmt.Println(msgs)
-	fmt.Println("GetStep END")
-
+	fmt.Print(msgs)
 	log.Error("012. Error")
 	log.Warning("013. WWWww    ")
 	log.Info("014. Info")
 	log.Info("015. Info")
 	msgs = log.GetAllLog()
-	fmt.Println(msgs)
+	fmt.Print(msgs)
 
 	return
 }
 
 func Test_New_Step_1(t *testing.T) {
 	log := NewZL()
-//	log.Step("001. Step 00")
+	//	log.Step("001. Step 00")
 	log.Info("001. info")
 	log.Info("002. Info 00 ")
 	log.Error("003. EEEEE 00 ")
@@ -51,6 +58,6 @@ func Test_New_Step_1(t *testing.T) {
 	log.Info("011. Info")
 
 	msgs := log.GetAllLog()
-	fmt.Println(msgs)
+	fmt.Print(msgs)
 	return
 }
