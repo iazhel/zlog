@@ -1,0 +1,34 @@
+¬:w
+$Step:      [info]:002. Info                                 [ERROR]¬:w
+  [error]  : 003. EEEEE    ¬:w
+     [info]:005. Info   ¬:w
+  [warning]: 006. WWWww    ¬:w
+  [error]  : 008. Error¬:w
+  [warning]: 009. WWWww    !¬:w
+$Step: 001.                                                  [OK]¬:w
+!¬:w
+$Step: 004.                                                  [OK]¬:w
+!¬:w
+$Step: 007.                                                  [OK]¬:w
+!¬:w
+$Step: 010.                                                  [OK]¬:w
+
+!!!!¬:w
+$Step:   [error]  : 012. Error                               [ERROR]¬:w
+  [warning]: 013. WWWww    ¬:w
+     [info]:014. Info¬:w
+     [info]:015. Info
+¬:w
+$Step:      [info]:001. info                                 [ERROR]¬:w
+     [info]:002. Info 00 ¬:w
+  [error]  : 003. EEEEE 00 ¬:w
+$Step: 004. Step 01                                          [WARNING]¬:w
+     [info]:005. Info 01¬:w
+  [warning]: 006. WWWww 011¬:w
+$Step: 007. Step 01                                          [ERROR]¬:w
+  [error]  : 008. Error¬:w
+  [warning]: 009. WWWww 011¬:w
+$Step: 010. Step 01                                          [OK]¬:w
+
+PASS
+ok  	_/home/oem/src/zlog	0.007s
