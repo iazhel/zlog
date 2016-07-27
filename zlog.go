@@ -17,6 +17,7 @@ const (
 	reserveLogFile = "/tmp/zlog_autosave.log"
 )
 
+// It is var for Windows
 var (
 	linesSep      = "\r\n"
 	prefixWarning = "  [warning]: "
@@ -25,10 +26,14 @@ var (
 	suffixWarning = "[WARNING]" + linesSep
 	suffixError   = "[ERROR]" + linesSep
 
-	prefixInfo    = "     [info]:"
 	endOutputLine = "\r\n################ Zlog session ############### %s"
 	prefixStep    = linesSep + "Step: "
-	suffixFormat  = "%-65s %s" // suffix format
+)
+
+// It is var for all OS
+var (
+	prefixInfo    = "     [info]:"
+	suffixFormat  = "%-65s %s" // indent for [OK][ERROR][WARNING] is 65 points.
 )
 
 // chain relationship implementing
@@ -60,11 +65,14 @@ func NewZL(out ...interface{}) *ZL {
 		linesSep = "\n"
 		prefixWarning = "  [\033[35mwarning\033[0m]: "
 		prefixError = "  [ \033[31merror\033[0m ]: "
-		suffixOK = "[\033[32mOK\033[0m]"// + linesSep
+		suffixOK = "[\033[32mOK\033[0m]" // + linesSep
 		suffixWarning = "[\033[35mWARNING\033[0m]" + linesSep
 		suffixError = "[ \033[31mERROR\033[0m ]" + linesSep
 		prefixStep = linesSep + "Step: "
-//		prefixStep = "Step: "
+	    endOutputLine = linesSep + "################ Zlog session ############### %s"
+	case "darwin":
+		linesSep = "\n"
+	    endOutputLine = linesSep + "################ Zlog session ############### %s"
 	}
 
 	zl := &ZL{
@@ -319,7 +327,7 @@ func (root *ZL) processChild(n int) bool {
 func (root *ZL) makeCaption(n int, suffix string) {
 	caption := root.logs[n][0]
 	if !strings.Contains(caption, prefixStep) {
-		caption = prefixStep + caption
+		caption = prefixStep +"(unknown)"+ caption
 	}
 	root.storage[n] += fmt.Sprintf(suffixFormat, caption, suffix)
 }
