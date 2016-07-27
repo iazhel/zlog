@@ -1,0 +1,4 @@
+1. Make write into file functions shorter.
+2. Define OS and format variables for each OS.  					- DONE
+3. Change time.nanoseconds method in main() programm on math.rand().
+4. Save processed log messages into root var, not into self.(only for Step()function). 	- DONE
