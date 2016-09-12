@@ -14,31 +14,13 @@ import (
 )
 
 const (
+	// will save logs in reserveLogFile, when NewZL have not an argument,
+	// or saving failed into this argument.
 	reserveLogFile = "/tmp/zlog_autosave.log"
 )
 
-// It is var for Windows
-var (
-	linesSep      = "\r\n"
-	prefixWarning = "  [warning]: "
-	prefixError   = "  [error]  : "
-	suffixOK      = "[OK]" + linesSep
-	suffixWarning = "[WARNING]" + linesSep
-	suffixError   = "[ERROR]" + linesSep
-
-	endOutputLine = "\r\n################ Zlog session ############### %s"
-	prefixStep    = linesSep + "Step: "
-)
-
-// It is var for all OS
-var (
-	prefixInfo    = "     [info]:"
-	suffixFormat  = "%-65s %s" // indent for [OK][ERROR][WARNING] is 65 points.
-)
-
-// chain relationship implementing
 type ZL struct {
-	sync.Mutex      //
+	sync.Mutex
 	isRoot          bool
 	parent          *ZL              // pointer to parent(root)
 	key             int              // key for map child
@@ -59,22 +41,6 @@ type pair struct {
 }
 
 func NewZL(out ...interface{}) *ZL {
-	curOS := runtime.GOOS
-	switch curOS {
-	case "linux":
-		linesSep = "\n"
-		prefixWarning = "  [\033[35mwarning\033[0m]: "
-		prefixError = "  [ \033[31merror\033[0m ]: "
-		suffixOK = "[\033[32mOK\033[0m]" // + linesSep
-		suffixWarning = "[\033[35mWARNING\033[0m]" + linesSep
-		suffixError = "[ \033[31mERROR\033[0m ]" + linesSep
-		prefixStep = linesSep + "Step: "
-	    endOutputLine = linesSep + "################ Zlog session ############### %s"
-	case "darwin":
-		linesSep = "\n"
-	    endOutputLine = linesSep + "################ Zlog session ############### %s"
-	}
-
 	zl := &ZL{
 		isRoot:          true,
 		removeBeforeGet: false,
@@ -147,21 +113,21 @@ func (self *ZL) Error(format string, v ...interface{}) {
 }
 
 func (self *ZL) GetStep() string {
-	return self.getLog()
+	return self.getLog(false)
 }
 
 func (self *ZL) GetAllLog() string {
 	root := self.goRoot()
-	return root.getLog()
+	return root.getLog(true)
 }
 
-func (self *ZL) getLog() string {
+func (self *ZL) getLog(all bool) string {
 	root := self.goRoot()
 	root.Lock()
 	msgs := []string{}
 	keys := []int{}
 
-	if self.isRoot {
+	if all {
 		// get all by sorted keys
 		keys = append(keys, 0)
 		for key := range root.children {
@@ -324,15 +290,40 @@ func (root *ZL) processChild(n int) bool {
 	return false
 }
 
+// It makes the step header and save it in storage.
+// If step was not defined, marks it 'Unknown step'
+// and always save first message in unknown step.
 func (root *ZL) makeCaption(n int, suffix string) {
-	caption := root.logs[n][0]
-	if !strings.Contains(caption, prefixStep) {
-		caption = prefixStep +"(unknown)"+ caption
+	if len(root.logs[n]) == 0 {
+		return
 	}
-	root.storage[n] += fmt.Sprintf(suffixFormat, caption, suffix)
+	firstLog := root.logs[n][0]
+	// for unknown steps
+	formatU := linesSep + "%-15s%-65s%-15s"
+	// for known steps
+	formatK := linesSep + "%-80s%-15s"
+	// when step header isn't exist
+	if !strings.Contains(firstLog, prefixStep) {
+		prefixUnknown := "Unknown Step"
+		switch suffix {
+		case suffixOK:
+			// add step header to storage with first msg included in
+			root.storage[n] += fmt.Sprintf(formatU, prefixUnknown, firstLog, suffix)
+		default:
+			// add step header to storage
+			root.storage[n] += fmt.Sprintf(formatU, prefixUnknown, "", suffix)
+			// add the first message
+			root.storage[n] += firstLog
+		}
+		return
+	}
+	// add step header only
+	root.storage[n] += fmt.Sprintf(formatK, firstLog, suffix)
 }
 
-// append logs to the file
+// It writes (appends) logs into the file,
+// what was argument the NewZL() function.
+// Else function saves into reserveLogFile.
 func (self *ZL) WriteAllLog() (n int, err error) {
 	outPath := self.goRoot().OutSource
 	// verify file existence
@@ -343,7 +334,8 @@ func (self *ZL) WriteAllLog() (n int, err error) {
 	return self.writeFile(self.GetAllLog(), "rewrite")
 }
 
-// append logs to the file
+// Function appends current step logs to the file.
+// It clear only this step.
 func (self *ZL) WriteStep() (n int, err error) {
 	outPath := self.goRoot().OutSource
 	// verify file existence
@@ -354,14 +346,14 @@ func (self *ZL) WriteStep() (n int, err error) {
 	return self.writeFile(self.GetStep(), "rewrite")
 }
 
-// creates new file and write start line into it.
+// It creates(rewrites) new file and write start line into it.
 func (self *ZL) CreateLogFile() (n int, err error) {
 	err = dirPrepare(self.goRoot().OutSource)
-	startLine := fmt.Sprintf(endOutputLine, time.Now())[:65] + linesSep
+	startLine := fmt.Sprintf("Started at %v %s", time.Now(), linesSep)
 	return self.writeFile(startLine, "rewrite")
 }
 
-// makes dir and waits until it is has been created
+// It makes dir and waits until it is has been created
 func dirPrepare(outPath string) (err error) {
 	dir, _ := filepath.Split(outPath)
 	if _, err := os.Stat(dir); err == nil {
@@ -379,7 +371,7 @@ func dirPrepare(outPath string) (err error) {
 	return err
 }
 
-// writeFile should write result into outSource,
+// Functions writeFile should write result into NewZL() argument,
 // if it can't open it, writeFile should write into ReserveFile.
 func (self *ZL) writeFile(logs, operation string) (n int, err error) {
 	//	logs := self.GetAllLog()
