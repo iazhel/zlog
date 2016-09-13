@@ -2,11 +2,9 @@ package zlog
 
 import (
 	"fmt"
-	"reflect"
 	"runtime"
 	"runtime/debug"
 	"strings"
-	"sync"
 )
 
 const (
@@ -16,50 +14,32 @@ const (
 	SLInfoSuffix    = "[ok]"
 	SLWarningSuffix = "[warning]"
 	SLErrorSuffix   = "[error]"
-	SLStep          = "    Step: "
+	SLStep          = "   Step: "
 )
 
 // lines sepatator
-var SLSep string
+var SLSeparator string
 
 // SL means simle or strem logger.
 type SL struct {
-	sync.Mutex
-	logs         []string // current logs place
-	storage      string   // storage of comresed steps.
-	warningPls   []int    // log positions what contains warnings
-	errorPls     []int    // log positions what contains errors
-	warningLines int      // number lines before warning to save
-	OutSource    string
-}
-
-type sPair struct {
-	begin, end int
+	logs       []string // current logs place
+	storage    string   // storage of comresed steps.
+	warningPls []int    // log positions what contains warnings
+	errorPls   []int    // log positions what contains errors
 }
 
 func NewSL(out ...interface{}) *SL {
-
-	SLSep = "\r\n"
+	SLSeparator = "\r\n"
 	if runtime.GOOS != "windows" {
-		SLSep = "\n"
+		SLSeparator = "\n"
 	}
-
-	sl := &SL{
-		warningLines: 10,
-		logs:         make([]string, 0),
+	return &SL{
+		logs: make([]string, 0),
 	}
-	if len(out) > 0 {
-		value := reflect.ValueOf(out[0])
-		if name := value.String(); len(name) > 0 {
-			sl.OutSource = name
-		}
-	}
-	return sl
 }
 
 func (self *SL) Step(format string, v ...interface{}) {
-	self.processChild()
-	//	self.add(SLStep, v...)
+	self.processLogs()
 	self.logs = append(self.logs, fmt.Sprintf(SLStep+format, v...))
 	return
 }
@@ -83,7 +63,7 @@ func (self *SL) GetAllLog() string {
 }
 
 func (self *SL) GetLog() string {
-	self.processChild()
+	self.processLogs()
 	msgs := self.storage
 	self.storage = ""
 	defer debug.FreeOSMemory()
@@ -91,118 +71,62 @@ func (self *SL) GetLog() string {
 	return msgs
 }
 
-// returns range of lines, what should be saved with Warning log
-func sRange(warningPls []int, warningLines int) (pairs []sPair) {
-	var saved, begin int
-	for _, p := range warningPls {
-		if p-warningLines < saved {
-			begin = saved + 1
-		} else {
-			begin = p - warningLines
-		}
-		pairs = append(pairs, sPair{begin, p + 1})
-		saved = p
-	}
-	return pairs
-}
-
-// moves important msgs from logs to storage
-// returns code.
-func (self *SL) processChild() {
-
+func (self *SL) processLogs() {
 	if len(self.logs) == 0 {
 		return
 	}
-
-	// check error existence
-	if len(self.errorPls) != 0 {
-		// make step header
+	switch {
+	case len(self.errorPls) != 0:
 		self.makeCaption(SLErrorSuffix)
-		// copy data to the storage
-		self.storage += strings.Join(self.logs[1:], SLSep)
-		// claear logs
-		self.logs = []string{}
-		self.errorPls = []int{}
-		self.warningPls = []int{}
-		return
+	case len(self.warningPls) != 0:
+		self.makeCaption(SLWarningSuffix)
+	default:
+		self.makeCaption(SLInfoSuffix)
 	}
 
-	// check warning existence
-	if len(self.warningPls) != 0 {
-		// save step header
-		self.makeCaption(SLWarningSuffix)
-		// get lines ranges to save
-		saveRange := sRange(self.warningPls, self.warningLines)
-		msgs := []string{}
-		// join lines in blocks
-		for _, pairs := range saveRange {
-			s, e := pairs.begin, pairs.end
-			msgs = append(msgs, strings.Join(self.logs[s:e], SLSep))
-		}
-		// join all blocks in one string
-		self.storage += strings.Join(msgs, SLSep)
-		// clear logs
-		self.logs = []string{}
-		self.warningPls = []int{}
-		return
-	}
-	// at the end, if all OK. I make step header:
-	self.makeCaption(SLInfoSuffix)
+	self.storage += strings.Join(self.logs, SLSeparator) + SLSeparator
 	// clear logs
 	self.logs = []string{}
+	self.errorPls = []int{}
+	self.warningPls = []int{}
 	return
 }
 
-// It makes the step header and save it in storage.
+// It makes the step header and save it.
 // If step was not defined, marks it 'Unknown step'
-// and always save first message in unknown step.
 func (self *SL) makeCaption(suffix string) {
-
 	if len(self.logs) == 0 {
 		return
 	}
-	firstLog := self.logs[0]
-	// for unknown steps
-	formatU := SLSep + "%-15s%-65s%-15s"
-	// for known steps
-	formatK := SLSep + "%-80s%-15s"
 
 	// when step header isn't exist
-	if !strings.Contains(firstLog, SLStep) {
-		prefixUnknown := "Unknown Step"
-		switch suffix {
-		case SLInfoSuffix:
-			// add step header to storage with first msg included in
-			self.storage += fmt.Sprintf(formatU, prefixUnknown, firstLog, suffix)
-		default:
-			// add step header to storage
-			self.storage += fmt.Sprintf(formatU, prefixUnknown, fill("", 65), suffix)
-			self.storage += SLSep
-			// add the first message
-			self.storage += firstLog
-		}
+	if !strings.Contains(self.logs[0], SLStep) {
+		// add step header to storage with first msg included in
+		filledMsg := fill(self.logs[0], 63)
+		self.logs[0] = fmt.Sprintf("%-15s%-63s%-15s", "   Unknown Step: ", filledMsg, suffix)
 		return
 	}
-
-	// add step header only
+	// Filling "................"
+	// Do not fill steps with OK.
+	filledMsg := self.logs[0]
 	if suffix != SLInfoSuffix {
-		firstLog = fill(firstLog, 80)
-		self.storage += fmt.Sprintf(formatK, firstLog, suffix)
-		self.storage += SLSep
-		return
+		filledMsg = fill(self.logs[0], 80)
 	}
 
-	self.storage += fmt.Sprintf(formatK, firstLog, suffix)
+	self.logs[0] = fmt.Sprintf("%-80s%-15s", filledMsg, suffix)
 	return
-
 }
 
 func fill(line string, n int) string {
-	// bad step lineFiller
-	badFiller := " ....................................................................."
-	if f := n - len(line); f > 5 && f < len(badFiller) {
-		return line + badFiller[:f]
+	filler := " ....................................................................."
+	f := n - len(line)
+	switch {
+	case f <= 0:
+		return line
+	case f > 5 && f < len(filler):
+		return line + filler[:f]
+	case f >= len(filler):
+		return line + filler
 	}
-	return line + badFiller
-
+	return line
 }
