@@ -1,5 +1,7 @@
 package zlog
 
+// type SL means SIMPLE or ONE STREAM logger.
+
 import (
 	"fmt"
 	"runtime"
@@ -20,7 +22,6 @@ const (
 // lines sepatator
 var SLSeparator string
 
-// SL means simle or strem logger.
 type SL struct {
 	logs       []string // current logs place
 	storage    string   // storage of comresed steps.
