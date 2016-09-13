@@ -11,9 +11,9 @@ const (
 	SLWarning       = "[WARNING]: "
 	SLError         = "[ERROR]: "
 	SLInfo          = "[info]: "
-	SLInfoSuffix    = "[ok]"
-	SLWarningSuffix = "[warning]"
-	SLErrorSuffix   = "[error]"
+	SLInfoSuffix    = " [ok]"
+	SLWarningSuffix = " [warning]"
+	SLErrorSuffix   = " [error]"
 	SLStep          = "   Step: "
 )
 
@@ -102,18 +102,18 @@ func (self *SL) makeCaption(suffix string) {
 	// when step header isn't exist
 	if !strings.Contains(self.logs[0], SLStep) {
 		// add step header to storage with first msg included in
-		filledMsg := fill(self.logs[0], 53)
-		self.logs[0] = fmt.Sprintf("%-15s%-53s%s", "   Unknown Step: ", filledMsg, suffix)
+		filledMsg := fill(self.logs[0], 52)
+		self.logs[0] = fmt.Sprintf("%-15s%-52s%s", "   Unknown Step: ", filledMsg, suffix)
 		return
 	}
 	// Filling "................"
 	// Do not fill steps with OK.
 	filledMsg := self.logs[0]
 	if suffix != SLInfoSuffix {
-		filledMsg = fill(self.logs[0], 70)
+		filledMsg = fill(self.logs[0], 69)
 	}
 
-	self.logs[0] = fmt.Sprintf("%-70s%s", filledMsg, suffix)
+	self.logs[0] = fmt.Sprintf("%-69s%s", filledMsg, suffix)
 	return
 }
 
