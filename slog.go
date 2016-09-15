@@ -24,7 +24,7 @@ var SLSeparator string
 
 type SL struct {
 	logs       []string // current logs place
-	storage    string   // storage of comresed steps.
+	storage    []string // storage of comresed steps.
 	warningPls []int    // log positions what contains warnings
 	errorPls   []int    // log positions what contains errors
 }
@@ -66,10 +66,13 @@ func (self *SL) GetAllLog() string {
 func (self *SL) GetLog() string {
 	self.processLogs()
 	msgs := self.storage
-	self.storage = ""
+	self.storage = []string{}
 	defer debug.FreeOSMemory()
 	defer runtime.GC()
-	return msgs
+	if len(msgs) == 0 {
+		return ""
+	}
+	return strings.Join(msgs, SLSeparator) + SLSeparator
 }
 
 func (self *SL) processLogs() {
@@ -85,7 +88,7 @@ func (self *SL) processLogs() {
 		self.makeCaption(SLInfoSuffix)
 	}
 
-	self.storage += strings.Join(self.logs, SLSeparator) + SLSeparator
+	self.storage = append(self.storage, self.logs...)
 	// clear logs
 	self.logs = []string{}
 	self.errorPls = []int{}
