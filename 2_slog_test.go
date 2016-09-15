@@ -7,7 +7,7 @@ import (
 )
 
 func Test_Z1100(t *testing.T) {
-	sl := NewZL()
+	sl := NewSL()
 
 	sl.Info("I0")
 	sl.Info("I1")
