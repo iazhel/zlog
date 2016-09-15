@@ -6,19 +6,17 @@ import (
 	"testing"
 )
 
-func Test_1100(t *testing.T) {
-	sl := NewSL()
+func Test_Z1100(t *testing.T) {
+	sl := NewZL()
 
 	sl.Info("I0")
 	sl.Info("I1")
-	sl.Info("I2")
 
 	sl.Step("step ii..")
-	sl.Info("I1")
-	sl.Info("I1")
+	sl.Info("I0")
 
 	sl.Step("")
-	sl.Step("step 333333333333333333333333333333333333333333333333333333333333333333333332")
+	sl.Step("step Long log ------------------------------------------------------------------------")
 
 	sl.Step("step iwi..")
 	sl.Info("I")
@@ -32,13 +30,6 @@ func Test_1100(t *testing.T) {
 	sl.Warning("W")
 	sl.Info("I")
 
-	sl.Step("step iwei.")
-	sl.Warning("W")
-	sl.Info("I")
-	sl.Warning("W")
-	sl.Error("E")
-	sl.Info("I")
-
 	sl.Step("step i")
 	sl.Info("I")
 	sl.Error("E")
@@ -46,19 +37,17 @@ func Test_1100(t *testing.T) {
 
 	logs := sl.GetAllLog()
 
-	sl.Info("I")
-	sl.Info("I")
-	sl.Info("I")
+	sl.Info("I0")
+	sl.Info("I1")
 	logs += sl.GetAllLog()
 
 	sl.Warning("W")
-	sl.Info("I")
-	sl.Info("I")
+	sl.Info("I0")
 	logs += sl.GetAllLog()
 
 	sl.Error("E")
-	sl.Info("I")
-	sl.Info("I")
+	sl.Info("I0")
+	sl.Info("I1")
 	logs += sl.GetAllLog()
 
 	sl.Step("s.....")

@@ -27,7 +27,7 @@ type ZL struct {
 	nextKey         int              //
 	children        map[int]*ZL      // pointers to childs
 	logs            map[int][]string // current logs place
-	storage         map[int]string   // storage of comresed steps.
+	storage         map[int][]string // storage of comresed steps.
 	warningPls      []int            // log positions what contains warnings
 	errorPls        []int            // log positions what contains errors
 	warningLines    int              // number lines before warning to save
@@ -46,9 +46,8 @@ func NewZL(out ...interface{}) *ZL {
 		removeBeforeGet: false,
 		warningLines:    10,
 		logs:            make(map[int][]string, 0),
-		//		logsCounter:        make(map[int]int, 0),
-		storage:  make(map[int]string, 0),
-		children: make(map[int]*ZL, 0),
+		storage:         make(map[int][]string, 0),
+		children:        make(map[int]*ZL, 0),
 	}
 	if len(out) > 0 {
 		value := reflect.ValueOf(out[0])
@@ -76,10 +75,6 @@ func (self *ZL) Step(format string, v ...interface{}) {
 	root := self.goRoot()
 	n := self.key
 	root.Lock()
-	if root.removeBeforeGet {
-		self.compress()
-	}
-	n = self.key
 	_ = root.processChild(n)
 	root.logs[n] = append(root.logs[n], fmt.Sprintf(prefixStep+format, v...))
 	root.Unlock()
@@ -130,29 +125,23 @@ func (self *ZL) getLog(all bool) string {
 	if all {
 		// get all by sorted keys
 		keys = append(keys, 0)
-		for key := range root.children {
-			keys = append(keys, key)
+		for theKey := range root.children {
+			keys = append(keys, theKey)
 		}
 		sort.Ints(keys)
-		if root.removeBeforeGet {
-			root.compressAll()
-		}
-
 	} else {
 		// get by one key
 		key := self.key
 		keys = append(keys, key)
-		if root.removeBeforeGet {
-			self.compress()
-		}
 	}
 
 	for _, key := range keys {
 		_ = root.processChild(key)
-		// check map on key existense
+
+		// Add newline ??
 		if msg, e := root.storage[key]; e == true {
-			msgs = append(msgs, msg)
-			root.storage[key] = string("")
+			msgs = append(msgs, msg...)
+			root.storage[key] = []string{}
 		}
 	}
 
@@ -160,47 +149,21 @@ func (self *ZL) getLog(all bool) string {
 	defer runtime.GC()
 
 	root.Unlock()
-	return strings.Join(msgs, "")
-}
-
-// Checks logs on attentions messages.
-// If *ZL do not contains logs with attentions,
-// removes logs.
-func (self *ZL) compress() {
-	n := self.key
-	// check on attentions.
-	withoutAttention := len(self.errorPls) == 0 && len(self.warningPls) == 0
-	root := self.goRoot()
-	// means no errors, warnings and the storage is empty
-	if withoutAttention && len(root.storage[n]) == 0 {
-		root.logs[self.key] = []string{}
-		//		delete(root.children, n)
-		//		delete(root.logs, n)
-		//		delete(root.storage, n)
+	if len(msgs) == 0 {
+		return ""
 	}
-}
-
-func (self *ZL) compressAll() {
-	root := self.goRoot()
-	for _, zl := range root.children {
-		zl.compress()
-	}
-	return
+	return strings.Join(msgs, linesSep) + linesSep
 }
 
 func (self *ZL) SetWarningLines(n int) {
 	self.goRoot().warningLines = n
 }
 
-func (self *ZL) SetRemoveBeforeGet(s bool) {
-	self.goRoot().removeBeforeGet = s
-}
-
 func (self *ZL) goRoot() *ZL {
-	if !self.isRoot {
-		return self.parent
+	if self.isRoot {
+		return self
 	}
-	return self
+	return self.parent
 }
 
 func (self *ZL) clone() *ZL {
@@ -213,14 +176,15 @@ func (self *ZL) clone() *ZL {
 		key:    key,
 	}
 	theParent.logs[key] = []string{}
-	theParent.storage[key] = string("")
+	theParent.storage[key] = []string{}
 	theParent.children[key] = newNode
 	return newNode
 }
 
 // returns range of lines, what should be saved with Warning log
-func getRange(warningPls []int, warningLines int) (pairs []pair) {
+func getWarningRange(warningPls []int, warningLines int) (pairs []pair) {
 	var saved, begin int
+	pairs = append(pairs, pair{0, 1})
 	for _, p := range warningPls {
 		if p-warningLines < saved {
 			begin = saved + 1
@@ -236,89 +200,75 @@ func getRange(warningPls []int, warningLines int) (pairs []pair) {
 // moves important msgs from logs to storage
 // returns code.
 func (root *ZL) processChild(n int) bool {
-	var ePls, wPls *[]int
-
-	if n == 0 {
-		ePls = &root.errorPls
-		wPls = &root.warningPls
-	} else {
-		root = root.goRoot()
-		ePls = &root.children[n].errorPls
-		wPls = &root.children[n].warningPls
-	}
+	var errLines, warnLines *[]int
 
 	// there are no logs
 	if len(root.logs[n]) == 0 {
 		return false
 	}
+	// define lines number with error and warning in
+	if n == 0 {
+		errLines = &root.errorPls
+		warnLines = &root.warningPls
+	} else {
+		root = root.goRoot()
+		errLines = &root.children[n].errorPls
+		warnLines = &root.children[n].warningPls
+	}
 
 	// check error existence
-	if len(*ePls) != 0 {
+	if len(*errLines) != 0 {
 		// make step header
 		root.makeCaption(n, suffixError)
 		// copy data to the storage
-		root.storage[n] += strings.Join(root.logs[n][1:], linesSep)
+		root.storage[n] = append(root.storage[n], root.logs[n]...)
 		// claear logs
 		root.logs[n] = []string{}
-		*ePls = []int{}
-		*wPls = []int{}
+		*errLines = []int{}
+		*warnLines = []int{}
 		return true
 	}
 	// check warning existence
-	if len(*wPls) != 0 {
+	if len(*warnLines) != 0 {
 		// save step header
 		root.makeCaption(n, suffixWarning)
 		// get lines ranges to save
-		saveRange := getRange(*wPls, root.warningLines)
-		msgs := []string{}
+		warningSaveRanges := getWarningRange(*warnLines, root.warningLines)
 		// join lines in blocks
-		for _, pairs := range saveRange {
-			s, e := pairs.begin, pairs.end
-			msgs = append(msgs, strings.Join(root.logs[n][s:e], linesSep))
+		for _, pair := range warningSaveRanges {
+			root.storage[n] = append(root.storage[n], root.logs[n][pair.begin:pair.end]...)
 		}
-		// join all blocks in one string
-		root.storage[n] += strings.Join(msgs, linesSep)
 		// clear logs
 		root.logs[n] = []string{}
-		*wPls = []int{}
+		*warnLines = []int{}
 		return true
 	}
+
 	// at the end, if all OK. I make step header:
 	root.makeCaption(n, suffixOK)
-	// clear logs
-	root.logs[n] = []string{}
+	if len(root.logs[n]) > 0 {
+		root.storage[n] = append(root.storage[n], root.logs[n][0])
+		// clear logs
+		root.logs[n] = []string{}
+	}
 	return false
 }
 
-// It makes the step header and save it in storage.
+// It makes the step header and save it.
 // If step was not defined, marks it 'Unknown step'
-// and always save first message in unknown step.
 func (root *ZL) makeCaption(n int, suffix string) {
 	if len(root.logs[n]) == 0 {
 		return
 	}
-	firstLog := root.logs[n][0]
-	// for unknown steps
-	formatU := linesSep + "%-15s%-65s%-15s"
-	// for known steps
-	formatK := linesSep + "%-80s%-15s"
 	// when step header isn't exist
-	if !strings.Contains(firstLog, prefixStep) {
-		prefixUnknown := "Unknown Step"
-		switch suffix {
-		case suffixOK:
-			// add step header to storage with first msg included in
-			root.storage[n] += fmt.Sprintf(formatU, prefixUnknown, firstLog, suffix)
-		default:
-			// add step header to storage
-			root.storage[n] += fmt.Sprintf(formatU, prefixUnknown, "", suffix)
-			// add the first message
-			root.storage[n] += firstLog
-		}
+	if !strings.Contains(root.logs[n][0], prefixStep) {
+		// add step header to storage with first msg included in
+		//root.logs[n][0] = fmt.Sprintf("%-15s%-52s%s"+linesSep+"%s", + "" after "   UnknownStep"
+		root.logs[n][0] = fmt.Sprintf("%-69s%s"+linesSep+"%s", "    Unknown Step: ", suffix, root.logs[n][0])
 		return
 	}
 	// add step header only
-	root.storage[n] += fmt.Sprintf(formatK, firstLog, suffix)
+	root.logs[n][0] = fmt.Sprintf("%-69s%s", root.logs[n][0], suffix)
 }
 
 // It writes (appends) logs into the file,
