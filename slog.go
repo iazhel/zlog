@@ -4,6 +4,8 @@ package zlog
 
 import (
 	"fmt"
+	"os"
+	"path"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -132,4 +134,27 @@ func fill(line string, n int) string {
 		return line + filler
 	}
 	return line
+}
+
+func (self *SL) WriteLog(filePath string) (n int, err error) {
+	return self.Write(self.GetAllLog(), filePath)
+}
+
+func (self *SL) Write(text, filePath string) (n int, err error) {
+	dir, file := path.Split(filePath)
+	err = os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return 0, err
+	}
+	f, err := os.OpenFile(path.Join(dir, file), os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
+	defer f.Close()
+	if err != nil {
+		return 0, err
+	}
+	b, err := f.WriteString(text)
+	if err != nil {
+		return 0, err
+	}
+	return b, err
+
 }

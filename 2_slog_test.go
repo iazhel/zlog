@@ -2,7 +2,6 @@ package zlog
 
 import (
 	"fmt"
-	"os"
 	"testing"
 )
 
@@ -50,14 +49,34 @@ func Test_Z1100(t *testing.T) {
 	sl.Info("I1")
 	logs += sl.GetAllLog()
 
-	sl.Step("s.....")
 	logs += sl.GetAllLog()
 
 	fmt.Println("******SLOG**********")
-	fmt.Println(logs)
+	fmt.Print(logs)
+	n, err := sl.Write(logs, "/tmp/logs/slog/s.log")
 
-	f, _ := os.Create("out.log")
-	n, _ := f.WriteString(logs)
+	sl.Step("Writed.....")
+	if err != nil {
+		t.Errorf("Can't possible to write into file %v", err)
+		sl.Error("Not Correctly.")
+	}
+
+	logs = sl.GetAllLog()
+	n, err = sl.Write(logs, "/tmp/logs/slog/s.log")
+	fmt.Print(logs)
+
+	sl.Step("Append .....")
+	if err != nil {
+		t.Errorf("Can't possible to append into file %v", err)
+		sl.Error("Not Correctly.")
+	}
+
+	logs = sl.GetAllLog()
+	n, err = sl.Write(logs, "/tmp/logs/slog/s.log")
+	fmt.Print(logs)
+	if err != nil {
+		t.Errorf("Can't possible to write into file %v", err)
+	}
 	fmt.Printf("Writed %d bytes\n", n)
 
 }
