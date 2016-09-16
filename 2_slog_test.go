@@ -7,7 +7,14 @@ import (
 
 func Test_Z1100(t *testing.T) {
 	sl := NewSL()
+	sl.Info("Should not preset in output !!!!")
+	filePath := "/tmp/logs/slog/s1.log"
+	n, err := sl.WriteNewLog(filePath)
+	if err != nil {
+		t.Errorf("Can't possible to write into file %v", err)
+	}
 
+	fmt.Printf("Writed %d bytes\n", n)
 	sl.Info("I0")
 	sl.Info("I1")
 
@@ -53,16 +60,16 @@ func Test_Z1100(t *testing.T) {
 
 	fmt.Println("******SLOG**********")
 	fmt.Print(logs)
-	n, err := sl.Write(logs, "/tmp/logs/slog/s.log")
 
-	sl.Step("Writed.....")
+	n, err = sl.WriteNew(logs, filePath)
+	sl.Step("WriteNew()")
 	if err != nil {
 		t.Errorf("Can't possible to write into file %v", err)
 		sl.Error("Not Correctly.")
 	}
 
 	logs = sl.GetAllLog()
-	n, err = sl.Write(logs, "/tmp/logs/slog/s.log")
+	n, err = sl.Write(logs, filePath)
 	fmt.Print(logs)
 
 	sl.Step("Append .....")
@@ -71,9 +78,7 @@ func Test_Z1100(t *testing.T) {
 		sl.Error("Not Correctly.")
 	}
 
-	logs = sl.GetAllLog()
-	n, err = sl.Write(logs, "/tmp/logs/slog/s.log")
-	fmt.Print(logs)
+	n, err = sl.WriteLog(filePath)
 	if err != nil {
 		t.Errorf("Can't possible to write into file %v", err)
 	}

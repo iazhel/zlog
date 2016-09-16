@@ -22,7 +22,9 @@ const (
 )
 
 // lines sepatator
-var SLSeparator string
+var (
+	SLSeparator string
+)
 
 type SL struct {
 	logs       []string // current logs place
@@ -136,25 +138,44 @@ func fill(line string, n int) string {
 	return line
 }
 
+// Get logs and append it to the file
 func (self *SL) WriteLog(filePath string) (n int, err error) {
-	return self.Write(self.GetAllLog(), filePath)
+	flag := os.O_CREATE | os.O_APPEND | os.O_WRONLY
+	return self.write(self.GetAllLog(), filePath, flag)
 }
 
+// Append text to the file
 func (self *SL) Write(text, filePath string) (n int, err error) {
+	flag := os.O_CREATE | os.O_APPEND | os.O_WRONLY
+	return self.write(text, filePath, flag)
+}
+
+// Create file, get logs and write it into the file
+func (self *SL) WriteNewLog(filePath string) (n int, err error) {
+	flag := os.O_RDWR | os.O_CREATE | os.O_TRUNC
+	return self.write(self.GetAllLog(), filePath, flag)
+}
+
+// Create file and append text to the file
+func (self *SL) WriteNew(text, filePath string) (n int, err error) {
+	flag := os.O_RDWR | os.O_CREATE | os.O_TRUNC
+	return self.write(text, filePath, flag)
+}
+
+func (self *SL) write(text, filePath string, flag int) (n int, err error) {
 	dir, file := path.Split(filePath)
 	err = os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
 		return 0, err
 	}
-	f, err := os.OpenFile(path.Join(dir, file), os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
-	defer f.Close()
+	f, err := os.OpenFile(path.Join(dir, file), flag, os.ModePerm)
 	if err != nil {
 		return 0, err
 	}
+	defer f.Close()
 	b, err := f.WriteString(text)
 	if err != nil {
 		return 0, err
 	}
 	return b, err
-
 }
